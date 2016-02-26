@@ -2,12 +2,14 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/catalyzeio/catalyze/models"
+	"github.com/Sirupsen/logrus"
+	"github.com/catalyzeio/cli/models"
 	"github.com/mitchellh/go-homedir"
 )
 
@@ -22,7 +24,7 @@ const LocalSettingsFile = "catalyze-config.json"
 // for retrieving settings based on the settings file or generating a settings
 // object based on a directly entered environment ID and service ID.
 type SettingsRetriever interface {
-	GetSettings(bool, bool, string, string, string, string, string, string) *models.Settings
+	GetSettings(string, string, string, string, string, string, string, string, string) *models.Settings
 }
 
 // FileSettingsRetriever reads in data from the SettingsFile and generates a
@@ -30,10 +32,10 @@ type SettingsRetriever interface {
 type FileSettingsRetriever struct{}
 
 // GetSettings returns a Settings object for the current context
-func (s FileSettingsRetriever) GetSettings(required bool, promptForEnv bool, envName string, svcName string, baasHost string, paasHost string, username string, password string) *models.Settings {
+func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authHost, ignoreAuthHostVersion, paasHost, ignorePaasHostVersion, username, password string) *models.Settings {
 	HomeDir, err := homedir.Dir()
 	if err != nil {
-		fmt.Println(err.Error())
+		logrus.Println(err.Error())
 		os.Exit(1)
 	}
 
@@ -43,7 +45,7 @@ func (s FileSettingsRetriever) GetSettings(required bool, promptForEnv bool, env
 	}
 	defer file.Close()
 	if err != nil {
-		fmt.Println(err.Error())
+		logrus.Println(err.Error())
 		os.Exit(1)
 	}
 	var settings models.Settings
@@ -57,14 +59,13 @@ func (s FileSettingsRetriever) GetSettings(required bool, promptForEnv bool, env
 	if envName != "" {
 		setGivenEnv(envName, &settings)
 		if settings.EnvironmentID == "" || settings.ServiceID == "" {
-			fmt.Printf("No environment named \"%s\" has been associated. Run \"catalyze associated\" to see what environments have been associated or run \"catalyze associate\" from a local git repo to create a new association\n", envName)
-			os.Exit(1)
+			logrus.Fatalf("No environment named \"%s\" has been associated. Run \"catalyze associated\" to see what environments have been associated or run \"catalyze associate\" from a local git repo to create a new association", envName)
 		}
 	}
 
 	// if no env name was given, try and fetch the local env
 	if settings.EnvironmentID == "" || settings.ServiceID == "" {
-		setLocalEnv(required, &settings)
+		setLocalEnv(&settings)
 	}
 
 	// if its not there, fetch the default
@@ -75,19 +76,45 @@ func (s FileSettingsRetriever) GetSettings(required bool, promptForEnv bool, env
 	// if no default, fetch the first associated env and print warning
 	if settings.EnvironmentID == "" || settings.ServiceID == "" {
 		// warn and ask
-		setFirstAssociatedEnv(required, promptForEnv, &settings)
+		setFirstAssociatedEnv(&settings)
 	}
 
-	// if no env found, warn and quit
+	/*// if no env found, warn and quit
 	if required && (settings.EnvironmentID == "" || settings.ServiceID == "") {
 		fmt.Println("No Catalyze environment has been associated. Run \"catalyze associate\" from a local git repo first")
 		os.Exit(1)
-	}
-
-	settings.BaasHost = baasHost
+	}*/
+	settings.AccountsHost = accountsHost
+	settings.AuthHost = authHost
 	settings.PaasHost = paasHost
 	settings.Username = username
 	settings.Password = password
+
+	authHostVersion := os.Getenv(AuthHostVersionEnvVar)
+	if authHostVersion == "" {
+		authHostVersion = AuthHostVersion
+	}
+	settings.AuthHostVersion = authHostVersion
+
+	paasHostVersion := os.Getenv(PaasHostVersionEnvVar)
+	if paasHostVersion == "" {
+		paasHostVersion = PaasHostVersion
+	}
+	settings.PaasHostVersion = paasHostVersion
+
+	logrus.Debugf("Accounts Host: %s", accountsHost)
+	logrus.Debugf("Auth Host: %s", authHost)
+	logrus.Debugf("Paas Host: %s", paasHost)
+	logrus.Debugf("Auth Host Version: %s", authHostVersion)
+	logrus.Debugf("Paas Host Version: %s", paasHostVersion)
+	logrus.Debugf("Default: %s", settings.Default)
+	logrus.Debugf("Environment ID: %s", settings.EnvironmentID)
+	logrus.Debugf("Environment Name: %s", settings.EnvironmentName)
+	logrus.Debugf("Pod: %s", settings.Pod)
+	logrus.Debugf("Service ID: %s", settings.ServiceID)
+	logrus.Debugf("Org ID: %s", settings.OrgID)
+
+	settings.Version = VERSION
 	return &settings
 }
 
@@ -95,13 +122,13 @@ func (s FileSettingsRetriever) GetSettings(required bool, promptForEnv bool, env
 func SaveSettings(settings *models.Settings) {
 	HomeDir, err := homedir.Dir()
 	if err != nil {
-		fmt.Println(err.Error())
+		logrus.Println(err.Error())
 		os.Exit(1)
 	}
 	b, _ := json.Marshal(&settings)
 	err = ioutil.WriteFile(filepath.Join(HomeDir, SettingsFile), b, 0644)
 	if err != nil {
-		fmt.Println(err.Error())
+		logrus.Println(err.Error())
 		os.Exit(1)
 	}
 }
@@ -114,7 +141,7 @@ func DropBreadcrumb(envName string, settings *models.Settings) {
 	})
 	err := ioutil.WriteFile(filepath.Join(".git", LocalSettingsFile), b, 0644)
 	if err != nil {
-		fmt.Println(err.Error())
+		logrus.Println(err.Error())
 		os.Exit(1)
 	}
 }
@@ -142,7 +169,9 @@ func setGivenEnv(envName string, settings *models.Settings) {
 		if eName == envName {
 			settings.EnvironmentID = e.EnvironmentID
 			settings.ServiceID = e.ServiceID
+			settings.Pod = e.Pod
 			settings.EnvironmentName = envName
+			settings.OrgID = e.OrgID
 		}
 	}
 }
@@ -150,19 +179,19 @@ func setGivenEnv(envName string, settings *models.Settings) {
 // setLocalEnv searches .git/catalyze-config.json for an associated env and
 // searches for it in the given settings object. It then populates the
 // EnvironmentID and ServiceID on the settings object with appropriate values.
-func setLocalEnv(required bool, settings *models.Settings) {
+func setLocalEnv(settings *models.Settings) {
 	file, err := os.Open(filepath.Join(".git", LocalSettingsFile))
 	defer file.Close()
 	if err == nil {
 		var breadcrumb models.Breadcrumb
 		json.NewDecoder(file).Decode(&breadcrumb)
-		if breadcrumb.EnvironmentID != "" && required {
+		/*if breadcrumb.EnvironmentID != "" { //}&& required {
 			// we found an old config file, try and translate it
 			//convertSettings(&breadcrumb, settings)
 			// or punt
 			fmt.Println("Please reassociate your environment and then run this command again")
 			os.Exit(1)
-		}
+		}*/
 		setGivenEnv(breadcrumb.EnvName, settings)
 	}
 }
@@ -178,14 +207,16 @@ func setDefaultEnv(settings *models.Settings) {
 // were found locally or from the default flag, then the first one in the list
 // of environments in the given settings object is used to populate
 // EnvironmentID and ServiceID with appropriate values.
-func setFirstAssociatedEnv(required bool, promptForEnv bool, settings *models.Settings) {
-	for envName, e := range settings.Environments {
+func setFirstAssociatedEnv(settings *models.Settings) {
+	for _, e := range settings.Environments {
 		settings.EnvironmentID = e.EnvironmentID
 		settings.ServiceID = e.ServiceID
+		settings.Pod = e.Pod
 		settings.EnvironmentName = e.Name
-		if promptForEnv {
+		settings.OrgID = e.OrgID
+		/*if promptForEnv {
 			defaultEnvPrompt(envName)
-		}
+		}*/
 		break
 	}
 }
@@ -193,7 +224,7 @@ func setFirstAssociatedEnv(required bool, promptForEnv bool, settings *models.Se
 // defaultEnvPrompt asks the user when they dont have a default environment and
 // aren't in an associated directory if they would like to proceed with the
 // first environment found.
-func defaultEnvPrompt(envName string) {
+func defaultEnvPrompt(envName string) error {
 	var answer string
 	for {
 		fmt.Printf("No environment was specified and no default environment was found. Falling back to %s\n", envName)
@@ -207,7 +238,25 @@ func defaultEnvPrompt(envName string) {
 		}
 	}
 	if answer == "n" {
-		fmt.Println("Exiting")
-		os.Exit(1)
+		return errors.New("Exiting")
 	}
+	return nil
+}
+
+// CheckRequiredAssociation ensures if an association is required for a command to run,
+// that an appropriate environment has been picked and values assigned to the
+// given settings object before a command is run. This is intended to be called
+// before every command.
+func CheckRequiredAssociation(required, prompt bool, settings *models.Settings) error {
+	if required && (settings.EnvironmentID == "" || settings.ServiceID == "") {
+		err := ErrEnvRequired
+		if prompt {
+			for _, e := range settings.Environments {
+				err = defaultEnvPrompt(e.Name)
+				break
+			}
+		}
+		return err
+	}
+	return nil
 }

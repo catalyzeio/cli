@@ -1,11 +1,30 @@
 package models
 
-// Errors is a wrapper around an array of errors from the API
-type Errors struct {
-	ReportedErrors *[]ReportedError `json:"errors"`
-	Title          string           `json:"title"`
-	Description    string           `json:"description"`
-	Code           int              `json:"code"`
+import "github.com/jawher/mow.cli"
+
+type Role struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type Org struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type Command struct {
+	Name      string
+	ShortHelp string
+	LongHelp  string
+	CmdFunc   func(settings *Settings) func(cmd *cli.Cmd)
+}
+
+// Error is a wrapper around an array of errors from the API
+type Error struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Code        int    `json:"code"`
 }
 
 // ReportedError is the standard error model sent back from the API
@@ -16,23 +35,33 @@ type ReportedError struct {
 
 // Login is used for making an authentication request
 type Login struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Identifier string `json:"identifier"`
+	Password   string `json:"password"`
 }
 
-// Invite represents an invitation to an environment
+type PostInvite struct {
+	Email        string `json:"email"`
+	Role         int    `json:"role"`
+	LinkTemplate string `json:"linkTemplate"`
+}
+
+// Invite represents an invitation to an organization
 type Invite struct {
-	ID            string `json:"id,omitempty"`
-	Code          string `json:"code,omitempty"`
-	Email         string `json:"email"`
-	EnvironmentID string `json:"environmentId,omitempty"`
+	ID       string `json:"id"`
+	OrgID    string `json:"orgID"`
+	SenderID string `json:"senderID"`
+	RoleID   int    `json:"roleID"`
+	Email    string `json:"email"`
+	Consumed bool   `json:"consumed"`
+	Revoked  bool   `json:"revoked"`
 }
 
 // User is an authenticated User
 type User struct {
-	Username     string `json:"username"`
+	Username     string `json:"name"`
+	Email        string `json:"email"`
 	SessionToken string `json:"sessionToken"`
-	UsersID      string `json:"usersId"`
+	UsersID      string `json:"id"`
 }
 
 // EncryptionStore holds the values for encryption on backup/import jobs
@@ -41,46 +70,26 @@ type EncryptionStore struct {
 	IV  string `json:"iv"`
 }
 
-// Import creation object
-type Import struct {
-	Location  string            `json:"location"`
-	Key       string            `json:"key"`
-	IV        string            `json:"iv"`
-	WipeFirst bool              `json:"wipeBeforeImport"`
-	Options   map[string]string `json:"options"`
-}
-
 // TempURL holds a URL for uploading or downloading files from a temporary URL
 type TempURL struct {
 	URL string `json:"url"`
 }
 
-// Task task
-type Task struct {
+// OrgUser users who have access to an org
+type OrgUser struct {
 	ID     string `json:"id"`
-	Status string `json:"status"`
-}
-
-// EnvironmentData is the data blob inside of an Environment
-type EnvironmentData struct {
-	Name      string     `json:"name"`
-	Services  *[]Service `json:"services"`
-	Namespace string     `json:"namespace"`
-	DNSName   string     `json:"dns_name"`
-}
-
-// EnvironmentUsers users who have access to an environment
-type EnvironmentUsers struct {
-	Users []string `json:"users"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	RoleID int    `json:"roleID"`
 }
 
 // Environment environment
 type Environment struct {
-	ID    string           `json:"environmentId"`
-	State string           `json:"state"`
-	Data  *EnvironmentData `json:"data"`
-	PodID string           `json:"podId"`
-	Name  string           `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Pod       string `json:"pod"`
+	Namespace string `json:"namespace"`
+	OrgID     string `json:"organizationId"`
 }
 
 // Job job
@@ -107,52 +116,61 @@ type Payload struct {
 
 // Service service
 type Service struct {
-	ID           string            `json:"id"`
-	Type         string            `json:"type"`
-	Label        string            `json:"label"`
-	Size         interface{}       `json:"size"`
-	BuildStatus  string            `json:"build_status"`
-	DeployStatus string            `json:"deploy_status"`
-	Name         string            `json:"name"`
-	EnvVars      map[string]string `json:"environmentVariables"`
-	Source       string            `json:"source"`
-	LBIP         string            `json:"load_balancer_ip,omitempty"`
-	DockerImage  string            `json:"docker_image,omitempty"`
+	ID      string            `json:"id,omitempty"`
+	Type    string            `json:"type,omitempty"`
+	Label   string            `json:"label"`
+	Size    ServiceSize       `json:"size"`
+	Name    string            `json:"name"`
+	EnvVars map[string]string `json:"environmentVariables,omitempty"`
+	Source  string            `json:"source,omitempty"`
+	LBIP    string            `json:"load_balancer_ip,omitempty"`
 }
 
 // ServiceSize holds size information for a service
 type ServiceSize struct {
-	ServiceID string `json:"service"`
-	RAM       string `json:"ram"`
-	Storage   string `json:"storage"`
-	Behavior  string `json:"behavior"`
-	Type      string `json:"type"`
-	CPU       string `json:"cpu"`
-}
-
-// PodMetadata podmetadata
-type PodMetadata struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	PHISafe              bool   `json:"phiSafe"`
-	ImportRequiresLength bool   `json:"importRequiresLength"`
+	RAM      int    `json:"ram"`
+	Storage  int    `json:"storage"`
+	Behavior string `json:"behavior"`
+	Type     string `json:"type"`
+	CPU      int    `json:"cpu"`
 }
 
 // Settings holds various settings for the current context. All items with
 // `json:"-"` are never persisted to disk but used in memory for the current
 // command.
 type Settings struct {
-	BaasHost        string                   `json:"-"`
-	PaasHost        string                   `json:"-"`
+	AccountsHost    string `json:"-"`
+	AuthHost        string `json:"-"`
+	PaasHost        string `json:"-"`
+	AuthHostVersion string `json:"-"`
+	PaasHostVersion string `json:"-"`
+	Version         string `json:"-"`
+
 	Username        string                   `json:"-"`
 	Password        string                   `json:"-"`
 	EnvironmentID   string                   `json:"-"` // the id of the environment used for the current command
 	ServiceID       string                   `json:"-"` // the id of the service used for the current command
+	Pod             string                   `json:"-"` // the pod used for the current command
 	EnvironmentName string                   `json:"-"` // the name of the environment used for the current command
+	OrgID           string                   `json:"-"` // the org ID the chosen environment for this commands belongs to
+	PrivateKeyPath  string                   `json:"private_key_path"`
 	SessionToken    string                   `json:"token"`
 	UsersID         string                   `json:"user_id"`
 	Environments    map[string]AssociatedEnv `json:"environments"`
 	Default         string                   `json:"default"`
+	Pods            *[]Pod                   `json:"pods"`
+}
+
+// PodWrapper pod wrapper
+type PodWrapper struct {
+	Pods *[]Pod `json:"pods"`
+}
+
+// Pod is a pod returned from the pod router
+type Pod struct {
+	Name                 string `json:"name"`
+	PHISafe              bool   `json:"phiSafe"`
+	ImportRequiresLength bool   `json:"importRequiresLength"`
 }
 
 // AssociatedEnv holds information about an associated environment
@@ -161,6 +179,8 @@ type AssociatedEnv struct {
 	ServiceID     string `json:"serviceId"`
 	Directory     string `json:"dir"`
 	Name          string `json:"name"`
+	Pod           string `json:"pod"`
+	OrgID         string `json:"organizationId"`
 }
 
 // Breadcrumb is stored in a local git repo to make a link back to the
@@ -181,55 +201,41 @@ type ConsoleCredentials struct {
 
 // Metrics holds all metrics data for an entire environment or a single service
 type Metrics struct {
-	ServiceName  string `json:"serviceName"`
-	ServiceType  string `json:"serviceType"`
-	ServiceID    string `json:"serviceId"`
-	ServiceLabel string `json:"serviceLabel"`
-	Jobs         *[]Job `json:"jobs"`
+	ServiceName  string       `json:"serviceName"`
+	ServiceType  string       `json:"serviceType"`
+	ServiceID    string       `json:"serviceId"`
+	ServiceLabel string       `json:"serviceLabel"`
+	Size         ServiceSize  `json:"size"`
+	Data         *MetricsData `json:"metrics"`
 }
 
 // MetricsData is a container for each type of metrics: network, memory, etc.
 type MetricsData struct {
-	Network *NetworkData `json:"network"`
-	Memory  *MinMaxAvg   `json:"memory"`
-	DiskIO  *DiskIOData  `json:"diskio"`
-	TS      int64        `json:"ts"`
-	Name    string       `json:"name"`
-	CPU     *CPUData     `json:"cpu"`
+	CPUUsage     *[]MetricUsage  `json:"cpu.usage"`
+	MemoryUsage  *[]MetricUsage  `json:"memory.usage"`
+	NetworkUsage *[]NetworkUsage `json:"network.usage"`
 }
 
-// NetworkData holds metrics data for the network category
-type NetworkData struct {
-	TXKb      float64 `json:"tx_kb"`
-	TXPackets float64 `json:"tx_packets"`
-	TXDropped float64 `json:"tx_dropped"`
-	TXErrors  float64 `json:"tx_errors"`
-	RXKb      float64 `json:"rx_kb"`
-	RXPackets float64 `json:"rx_packets"`
+type MetricUsage struct {
+	JobID string  `json:"job"`
+	Total float64 `json:"total"`
+	AVG   float64 `json:"ave"`
+	Max   float64 `json:"max"`
+	Min   float64 `json:"min"`
+	TS    int     `json:"ts"`
+}
+
+type NetworkUsage struct {
+	JobID     string  `json:"job"`
 	RXDropped float64 `json:"rx_dropped"`
 	RXErrors  float64 `json:"rx_errors"`
-}
-
-// MinMaxAvg is a generic metrics data structure holding the minimum, maximum,
-// and average values.
-type MinMaxAvg struct {
-	Min float64 `json:"min"`
-	Max float64 `json:"max"`
-	Avg float64 `json:"ave"`
-}
-
-// DiskIOData is a data structure holding metrics values for the DiskIO category
-type DiskIOData struct {
-	Read  float64 `json:"read"`
-	Async float64 `json:"async"`
-	Write float64 `json:"write"`
-	Sync  float64 `json:"sync"`
-}
-
-// CPUData is a data structure holding metrics values for the CPU category
-type CPUData struct {
-	Usage float64    `json:"usage"`
-	Load  *MinMaxAvg `json:"load"`
+	RXKB      float64 `json:"rx_kb"`
+	RXPackets float64 `json:"rx_packets"`
+	TXDropped float64 `json:"tx_dropped"`
+	TXErrors  float64 `json:"tx_errors"`
+	TXKB      float64 `json:"tx_kb"`
+	TXPackets float64 `json:"tx_packets"`
+	TS        int     `json:"ts"`
 }
 
 // Logs hold the log values from a successful LogQuery
@@ -255,11 +261,42 @@ type LogHits struct {
 
 // ServiceFile is a file associated with a service
 type ServiceFile struct {
-	ID             int64  `json:"id"`
+	ID             int    `json:"id"`
 	Contents       string `json:"contents"`
-	GID            int64  `json:"gid"`
+	GID            int    `json:"gid"`
 	Mode           string `json:"mode"`
 	Name           string `json:"name"`
-	UID            int64  `json:"uid"`
+	UID            int    `json:"uid"`
 	EnableDownload bool   `json:"enable_download"`
+}
+
+type Site struct {
+	ID              int    `json:"id,omitempty"`
+	Name            string `json:"name"`
+	Cert            string `json:"cert"`
+	SiteFileID      int    `json:"siteFileId,omitempty"`
+	UpstreamService string `json:"upstreamService"`
+}
+
+type Cert struct {
+	Name    string `json:"name"`
+	PubKey  string `json:"sslCertFile"`
+	PrivKey string `json:"sslPKFile"`
+
+	Service   string `json:"service,omitempty"`
+	PubKeyID  int    `json:"sslCertFileId,omitempty"`
+	PrivKeyID int    `json:"sslPKFileId,omitempty"`
+}
+
+// UserKey is a public key belonging to a user
+type UserKey struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
+}
+
+// DeployKey is an ssh key belonging to an environment's code service
+type DeployKey struct {
+	Name string `json:"name"`
+	Key  string `json:"value"`
+	Type string `json:"type"`
 }

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/catalyzeio/catalyze/catalyze"
+import "github.com/catalyzeio/cli/catalyze"
 
 func main() {
 	catalyze.Run()
