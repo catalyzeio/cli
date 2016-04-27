@@ -265,13 +265,13 @@ type LogHits struct {
 
 // ServiceFile is a file associated with a service
 type ServiceFile struct {
-	ID             int    `json:"id"`
-	Contents       string `json:"contents"`
-	GID            int    `json:"gid"`
-	Mode           string `json:"mode"`
-	Name           string `json:"name"`
-	UID            int    `json:"uid"`
-	EnableDownload bool   `json:"enable_download"`
+	ID             int    `json:"id,omitempty"`
+	Contents       string `json:"contents,omitempty"`
+	GID            int    `json:"gid,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	Name           string `json:"name,omitempty"`
+	UID            int    `json:"uid,omitempty"`
+	EnableDownload bool   `json:"enable_download,omitempty"`
 }
 
 type Site struct {

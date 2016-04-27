@@ -37,7 +37,12 @@ func CmdDownload(svcName, fileName, output string, force bool, ifiles IFiles, is
 	if file == nil {
 		return fmt.Errorf("File with name %s does not exist. Try listing files again by running \"catalyze files list %s\"", fileName, svcName)
 	}
-	return ifiles.Save(output, force, file)
+	err = ifiles.Save(output, force, file)
+	if err != nil {
+		return err
+	}
+	logrus.Printf("Successfully saved file to %s", output)
+	return nil
 }
 
 func (f *SFiles) Retrieve(fileName string, svcID string) (*models.ServiceFile, error) {
