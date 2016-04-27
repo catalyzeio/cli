@@ -19,7 +19,9 @@ var Cmd = models.Command{
 	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
 		return func(cmd *cli.Cmd) {
 			cmd.Command(DownloadSubCmd.Name, DownloadSubCmd.ShortHelp, DownloadSubCmd.CmdFunc(settings))
+			cmd.Command(EditSubCmd.Name, EditSubCmd.ShortHelp, EditSubCmd.CmdFunc(settings))
 			cmd.Command(ListSubCmd.Name, ListSubCmd.ShortHelp, ListSubCmd.CmdFunc(settings))
+			cmd.Command(UploadSubCmd.Name, UploadSubCmd.ShortHelp, UploadSubCmd.CmdFunc(settings))
 		}
 	},
 }
@@ -51,6 +53,31 @@ var DownloadSubCmd = models.Command{
 	},
 }
 
+var EditSubCmd = models.Command{
+	Name:      "edit",
+	ShortHelp: "Interactively edit a file in $EDITOR and automatically upload when finished",
+	LongHelp:  "Interactively edit a file in $EDITOR and automatically upload when finished",
+	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
+		return func(subCmd *cli.Cmd) {
+			svcName := subCmd.StringArg("SERVICE_NAME", "service_proxy", "The name of the service to edit a file for")
+			fileName := subCmd.StringArg("FILE_NAME", "", "The name of the service file to update")
+			subCmd.Action = func() {
+				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
+					logrus.Fatal(err.Error())
+				}
+				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
+					logrus.Fatal(err.Error())
+				}
+				err := CmdEdit(*svcName, *fileName, New(settings), services.New(settings))
+				if err != nil {
+					logrus.Fatal(err.Error())
+				}
+			}
+			subCmd.Spec = "[SERVICE_NAME] FILE_NAME"
+		}
+	},
+}
+
 var ListSubCmd = models.Command{
 	Name:      "list",
 	ShortHelp: "List all files available for a given service",
@@ -75,12 +102,39 @@ var ListSubCmd = models.Command{
 	},
 }
 
+var UploadSubCmd = models.Command{
+	Name:      "upload",
+	ShortHelp: "Upload a locally edited service file for the given service",
+	LongHelp:  "Upload a locally edited service file for the given service",
+	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
+		return func(subCmd *cli.Cmd) {
+			svcName := subCmd.StringArg("SERVICE_NAME", "service_proxy", "The name of the service to update a file for")
+			fileName := subCmd.StringArg("FILE_NAME", "", "The name of the service file to update")
+			localFilePath := subCmd.StringArg("FILE_PATH", "", "The local path to the edited file")
+			subCmd.Action = func() {
+				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
+					logrus.Fatal(err.Error())
+				}
+				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
+					logrus.Fatal(err.Error())
+				}
+				err := CmdUpload(*svcName, *fileName, *localFilePath, New(settings), services.New(settings))
+				if err != nil {
+					logrus.Fatal(err.Error())
+				}
+			}
+			subCmd.Spec = "[SERVICE_NAME] FILE_NAME FILE_PATH"
+		}
+	},
+}
+
 // IFiles
 type IFiles interface {
 	Create(svcID, filePath, name, mode string) (*models.ServiceFile, error)
 	List(svcID string) (*[]models.ServiceFile, error)
 	Retrieve(fileName string, svcID string) (*models.ServiceFile, error)
 	Save(output string, force bool, file *models.ServiceFile) error
+	Update(svcID, filePath string, fileID int) error
 }
 
 // SFiles is a concrete implementation of IFiles
