@@ -34,12 +34,11 @@ import (
 	"github.com/catalyzeio/cli/commands/vars"
 	"github.com/catalyzeio/cli/commands/whoami"
 	"github.com/catalyzeio/cli/commands/worker"
+	"github.com/catalyzeio/cli/lib/pods"
+	"github.com/catalyzeio/cli/lib/updater"
 
 	"github.com/catalyzeio/cli/config"
 	"github.com/catalyzeio/cli/models"
-
-	"github.com/catalyzeio/cli/lib/pods"
-	"github.com/catalyzeio/cli/lib/updater"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jawher/mow.cli"
@@ -77,7 +76,6 @@ func Run() {
 			updater.AutoUpdater.BackgroundRun()
 		}
 	}
-
 	InitLogrus()
 
 	var app = cli.App("catalyze", fmt.Sprintf("Catalyze CLI. Version %s", config.VERSION))

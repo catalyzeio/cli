@@ -17,7 +17,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/catalyzeio/cli/config"
-	"github.com/catalyzeio/cli/lib/updater"
 	"github.com/catalyzeio/cli/models"
 )
 
@@ -195,8 +194,7 @@ func MakeRequest(method string, url string, body io.Reader, headers map[string][
 	defer resp.Body.Close()
 	respBody, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode == 412 {
-		updater.AutoUpdater.ForcedUpgrade()
-		return nil, 0, fmt.Errorf("A required update has been applied. Please re-run this command.")
+		return nil, 0, fmt.Errorf("An update is required. Please run the update command, then re-run this command.")
 	}
 	return respBody, resp.StatusCode, nil
 }

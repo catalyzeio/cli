@@ -129,6 +129,7 @@ func (u *Updater) BackgroundRun() error {
 		if err := u.update(); err != nil {
 			return err
 		}
+		u.UpdatePods()
 	}
 	return nil
 }
@@ -277,3 +278,14 @@ func verifySha(bin []byte, sha []byte) bool {
 func writeTime(path string, t time.Time) bool {
 	return ioutil.WriteFile(path, []byte(t.Format(time.RFC3339)), 0644) == nil
 }
+
+func (u *Updater) UpdatePods() {
+	fmt.Println("updating pods")
+	updatePods()
+}
+
+// get list of pods from pod-router -- lib/pods/list.go
+// example in catalyze/catalyze.go L121
+
+// update first, check for new pods second
+// /Users/johnmokry/go/workspace/bin/.catalyze_update/cktime - where the time is put

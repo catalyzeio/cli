@@ -10,6 +10,8 @@ import (
 )
 
 func CmdUpdate(iu IUpdate) error {
+	logrus.Printf("Updating active pods")
+	updater.AutoUpdater.UpdatePods()
 	logrus.Println("Checking for available updates...")
 	needsUpdate, err := iu.Check()
 	if err != nil {
