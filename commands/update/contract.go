@@ -19,6 +19,7 @@ var Cmd = models.Command{
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
+				updatePods(settings)
 			}
 		}
 	},
