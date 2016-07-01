@@ -35,7 +35,7 @@ func (s *SStatus) Status(env *models.Environment, services *[]models.Service) er
 	sortutil.AscByField(*services, "Label")
 
 	for _, service := range *services {
-		if service.Type != "utility" && service.Type != "" {
+		if service.Type != "" {
 			jobs, err := s.Jobs.RetrieveByStatus(service.ID, "running")
 			if err != nil {
 				return err
