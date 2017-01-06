@@ -3,17 +3,18 @@ package db
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/catalyzeio/cli/commands/services"
 	"github.com/catalyzeio/cli/lib/jobs"
 	"github.com/catalyzeio/cli/lib/prompts"
+	"github.com/catalyzeio/cli/lib/transfer"
 	"github.com/catalyzeio/cli/models"
-	"github.com/tj/go-spin"
 )
 
 func CmdExport(databaseName, filePath string, force bool, id IDb, ip prompts.IPrompts, is services.IServices, ij jobs.IJobs) error {
@@ -70,52 +71,87 @@ func CmdExport(databaseName, filePath string, force bool, id IDb, ip prompts.IPr
 // backup. Once finished, the CLI asks where the file can be downloaded from.
 // The file is downloaded, decrypted, and saved locally.
 func (d *SDb) Export(filePath string, job *models.Job, service *models.Service) error {
-	spinner := spin.New()
-	ticker := time.Tick(100 * time.Millisecond)
-	done := make(chan struct{}, 1)
-	go func() {
-		for {
-			select {
-			case <-ticker:
-				fmt.Printf("\r\033[mDownloading export %s. This may take awhile %s\033[m ", job.ID, spinner.Next())
-			case <-done:
-				return
-			}
-		}
-	}()
 	tempURL, err := d.TempDownloadURL(job.ID, service)
 	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	defer os.Remove(dir)
-	tmpFile, err := ioutil.TempFile(dir, "")
-	if err != nil {
-		done <- struct{}{}
 		return err
 	}
 	resp, err := http.Get(tempURL.URL)
 	if err != nil {
-		done <- struct{}{}
 		return err
 	}
 	defer resp.Body.Close()
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	done <- struct{}{}
-	logrus.Println("\nDecrypting...")
-	tmpFile.Close()
-	err = d.Crypto.DecryptFile(tmpFile.Name(), job.Backup.Key, job.Backup.IV, filePath)
+	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
 	if err != nil {
 		return err
 	}
-	return nil
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	dfw, err := d.Crypto.NewDecryptWriteCloser(file, job.Backup.Key, job.Backup.IV)
+	if err != nil {
+		return err
+	}
+
+	wct := transfer.NewWriteCloserTransfer(dfw, size)
+	done := make(chan bool)
+	go printTransferStatus(true, wct, done)
+
+	_, err = io.Copy(wct, resp.Body)
+	if err != nil {
+		done <- false
+		dfw.Close()
+		return err
+	}
+	done <- true
+	return dfw.Close()
+}
+
+func printTransferStatus(isDownload bool, tr transfer.Transfer, done <-chan bool) {
+	action := "downloaded"
+	final := "Download"
+	status := "Finished"
+	if isDownload {
+		logrus.Println("Decrypting and Downloading...")
+	} else {
+		logrus.Println("Encrypting and Uploading...")
+		action = "uploaded"
+		final = "Upload"
+	}
+	lastLen := 0
+	success := true
+	for i, l := tr.Transferred(), tr.Length(); i < l; i = tr.Transferred() {
+		select {
+		case success = <-done:
+			goto finish
+		case <-time.After(time.Millisecond * 100):
+			percent := uint64(i / l * 100)
+			s := fmt.Sprintf("\r\033[m\t%s of %s (%d%%) %s", i, l, percent, action)
+			fmt.Print(s)
+			sLen := len(s)
+			// this clears any dangling characters at the end with empty space
+			if sLen < lastLen {
+				fmt.Print(strings.Repeat(" ", lastLen-sLen))
+			} else {
+				lastLen = sLen
+			}
+		}
+	}
+	success = <-done
+
+finish:
+	total := tr.Transferred()
+	l := tr.Length()
+	s := fmt.Sprintf("\r\033[m\t%s of %s (%d%%) %s", total, l, uint64(total/l*100), action)
+	fmt.Print(s)
+	sLen := len(s)
+	// this clears any dangling characters at the end with empty space
+	if sLen < lastLen {
+		fmt.Print(strings.Repeat(" ", lastLen-sLen))
+	}
+
+	if !success {
+		status = "Failed"
+	}
+	logrus.Printf("\n%s %s!\n", final, status)
 }

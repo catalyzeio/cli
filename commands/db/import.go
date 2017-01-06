@@ -6,21 +6,23 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
+	"os/signal"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/catalyzeio/cli/commands/services"
 	"github.com/catalyzeio/cli/lib/crypto"
 	"github.com/catalyzeio/cli/lib/httpclient"
 	"github.com/catalyzeio/cli/lib/jobs"
+	"github.com/catalyzeio/cli/lib/prompts"
+	"github.com/catalyzeio/cli/lib/transfer"
 	"github.com/catalyzeio/cli/models"
 )
 
-func CmdImport(databaseName, filePath, mongoCollection, mongoDatabase string, id IDb, is services.IServices, ij jobs.IJobs) error {
+func CmdImport(databaseName, filePath, mongoCollection, mongoDatabase string, skipBackup bool, id IDb, ip prompts.IPrompts, is services.IServices, ij jobs.IJobs) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return fmt.Errorf("A file does not exist at path '%s'", filePath)
 	}
@@ -31,37 +33,44 @@ func CmdImport(databaseName, filePath, mongoCollection, mongoDatabase string, id
 	if service == nil {
 		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", databaseName)
 	}
-	logrus.Printf("Backing up \"%s\" before performing the import", databaseName)
-	job, err := id.Backup(service)
-	if err != nil {
-		return err
-	}
-	logrus.Printf("Backup started (job ID = %s)", job.ID)
+	if !skipBackup {
+		logrus.Printf("Backing up \"%s\" before performing the import", databaseName)
+		job, err := id.Backup(service)
+		if err != nil {
+			return err
+		}
+		logrus.Printf("Backup started (job ID = %s)", job.ID)
 
-	// all because logrus treats print, println, and printf the same
-	logrus.StandardLogger().Out.Write([]byte("Polling until backup finishes."))
-	status, err := ij.PollTillFinished(job.ID, service.ID)
-	if err != nil {
-		return err
-	}
-	job.Status = status
-	logrus.Printf("\nEnded in status '%s'", job.Status)
-	err = id.DumpLogs("backup", job, service)
-	if err != nil {
-		return err
-	}
-	if job.Status != "finished" {
-		return fmt.Errorf("Job finished with invalid status %s", job.Status)
+		// all because logrus treats print, println, and printf the same
+		logrus.StandardLogger().Out.Write([]byte("Polling until backup finishes."))
+		status, err := ij.PollTillFinished(job.ID, service.ID)
+		if err != nil {
+			return err
+		}
+		job.Status = status
+		logrus.Printf("\nEnded in status '%s'", job.Status)
+		err = id.DumpLogs("backup", job, service)
+		if err != nil {
+			return err
+		}
+		if job.Status != "finished" {
+			return fmt.Errorf("Job finished with invalid status %s", job.Status)
+		}
+	} else {
+		err := ip.YesNo("Are you sure you want to import data into your database without backing it up first? (y/n) ")
+		if err != nil {
+			return err
+		}
 	}
 	logrus.Printf("Importing '%s' into %s (ID = %s)", filePath, databaseName, service.ID)
-	job, err = id.Import(filePath, mongoCollection, mongoDatabase, service)
+	job, err := id.Import(filePath, mongoCollection, mongoDatabase, service)
 	if err != nil {
 		return err
 	}
 	// all because logrus treats print, println, and printf the same
 	logrus.StandardLogger().Out.Write([]byte(fmt.Sprintf("Processing import (job ID = %s).", job.ID)))
 
-	status, err = ij.PollTillFinished(job.ID, service.ID)
+	status, err := ij.PollTillFinished(job.ID, service.ID)
 	if err != nil {
 		return err
 	}
@@ -91,12 +100,20 @@ func (d *SDb) Import(filePath, mongoCollection, mongoDatabase string, service *m
 	iv := make([]byte, crypto.IVSize)
 	rand.Read(key)
 	rand.Read(iv)
-	logrus.Println("Encrypting...")
-	encrFilePath, err := d.Crypto.EncryptFile(filePath, key, iv)
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(encrFilePath)
+	defer file.Close()
+	fi, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	encryptFileReader, err := d.Crypto.NewEncryptReader(file, key, iv)
+	if err != nil {
+		return nil, err
+	}
+	rt := transfer.NewReaderTransfer(encryptFileReader, encryptFileReader.CalculateTotalSize(int(fi.Size())))
 	options := map[string]string{}
 	if mongoCollection != "" {
 		options["databaseCollection"] = mongoCollection
@@ -104,38 +121,48 @@ func (d *SDb) Import(filePath, mongoCollection, mongoDatabase string, service *m
 	if mongoDatabase != "" {
 		options["database"] = mongoDatabase
 	}
-	logrus.Println("Uploading...")
-	tempURL, err := d.TempUploadURL(service)
+	tmpAuth, err := d.TempUploadAuth(service)
 	if err != nil {
 		return nil, err
 	}
-	encrFile, err := os.Open(encrFilePath)
+	defer d.revokeAuth(service, tmpAuth)
+	// Make sure to revoke temp auth even with an interrupt.
+	c := make(chan os.Signal, 1)
+	// "done" is used below to cancel printing the download status
+	done := make(chan bool)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		done <- false
+		rt.KillTransfer()
+		d.revokeAuth(service, tmpAuth)
+		os.Exit(1)
+	}()
+	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-east-1"), Credentials: credentials.NewStaticCredentials(tmpAuth.AccessKeyID, tmpAuth.SecretAccessKey, tmpAuth.SessionToken)})
 	if err != nil {
+		done <- false
 		return nil, err
 	}
-	defer encrFile.Close()
+	uploader := s3manager.NewUploader(sess)
 
-	u, err := url.Parse(tempURL.URL)
-	if err != nil {
-		return nil, err
-	}
-	svc := s3.New(session.New(&aws.Config{Region: aws.String("us-east-1"), Credentials: credentials.AnonymousCredentials}))
-	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: aws.String(strings.Split(u.Host, ".")[0]),
-		Key:    aws.String(strings.TrimLeft(u.Path, "/")),
-		Body:   encrFile,
+	go printTransferStatus(false, rt, done)
+
+	_, err = uploader.Upload(&s3manager.UploadInput{
+		Bucket:               aws.String(tmpAuth.Bucket),
+		Key:                  aws.String(tmpAuth.FileName),
+		Body:                 rt,
+		ServerSideEncryption: aws.String("AES256"),
 	})
-	req.HTTPRequest.URL.RawQuery = u.RawQuery
-	err = req.Send()
 	if err != nil {
+		done <- false
 		return nil, err
 	}
-
+	done <- true
 	importParams := map[string]interface{}{}
 	for key, value := range options {
 		importParams[key] = value
 	}
-	importParams["filename"] = strings.TrimLeft(u.Path, "/")
+	importParams["filename"] = tmpAuth.FileName
 	importParams["encryptionKey"] = string(d.Crypto.Hex(key, crypto.KeySize*2))
 	importParams["encryptionIV"] = string(d.Crypto.Hex(iv, crypto.IVSize*2))
 	importParams["dropDatabase"] = false
@@ -157,16 +184,31 @@ func (d *SDb) Import(filePath, mongoCollection, mongoDatabase string, service *m
 	return &job, nil
 }
 
-func (d *SDb) TempUploadURL(service *models.Service) (*models.TempURL, error) {
+func (d *SDb) revokeAuth(service *models.Service, tmpAuth *models.TempAuth) {
+	if err := d.RevokeTempUploadAuth(service, tmpAuth.UserID); err != nil {
+		logrus.Printf("Failed to cleanup after uploading your encrypted file: %s", err)
+	}
+}
+
+func (d *SDb) TempUploadAuth(service *models.Service) (*models.TempAuth, error) {
 	headers := httpclient.GetHeaders(d.Settings.SessionToken, d.Settings.Version, d.Settings.Pod, d.Settings.UsersID)
-	resp, statusCode, err := httpclient.Get(nil, fmt.Sprintf("%s%s/environments/%s/services/%s/restore-url", d.Settings.PaasHost, d.Settings.PaasHostVersion, d.Settings.EnvironmentID, service.ID), headers)
+	resp, statusCode, err := httpclient.Get(nil, fmt.Sprintf("%s%s/environments/%s/services/%s/temp-auth?action_type=%s", d.Settings.PaasHost, d.Settings.PaasHostVersion, d.Settings.EnvironmentID, service.ID, "upload"), headers)
 	if err != nil {
 		return nil, err
 	}
-	var tempURL models.TempURL
-	err = httpclient.ConvertResp(resp, statusCode, &tempURL)
+	var tempAuth models.TempAuth
+	err = httpclient.ConvertResp(resp, statusCode, &tempAuth)
 	if err != nil {
 		return nil, err
 	}
-	return &tempURL, nil
+	return &tempAuth, nil
+}
+
+func (d *SDb) RevokeTempUploadAuth(service *models.Service, userID string) error {
+	headers := httpclient.GetHeaders(d.Settings.SessionToken, d.Settings.Version, d.Settings.Pod, d.Settings.UsersID)
+	resp, statusCode, err := httpclient.Delete(nil, fmt.Sprintf("%s%s/environments/%s/services/%s/revoke-temp-auth?user_id=%s", d.Settings.PaasHost, d.Settings.PaasHostVersion, d.Settings.EnvironmentID, service.ID, url.QueryEscape(userID)), headers)
+	if err != nil {
+		return err
+	}
+	return httpclient.ConvertResp(resp, statusCode, nil)
 }

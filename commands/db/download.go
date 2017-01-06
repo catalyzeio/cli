@@ -3,23 +3,13 @@ package db
 import (
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/url"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/catalyzeio/cli/commands/services"
 	"github.com/catalyzeio/cli/lib/httpclient"
 	"github.com/catalyzeio/cli/lib/prompts"
 	"github.com/catalyzeio/cli/models"
-	"github.com/tj/go-spin"
 )
 
 func CmdDownload(databaseName, backupID, filePath string, force bool, id IDb, ip prompts.IPrompts, is services.IServices) error {
@@ -60,65 +50,7 @@ func (d *SDb) Download(backupID, filePath string, service *models.Service) error
 	if job.Type != "backup" || (job.Status != "finished" && job.Status != "disappeared") {
 		return errors.New("Only 'finished' 'backup' jobs may be downloaded")
 	}
-	spinner := spin.New()
-	ticker := time.Tick(100 * time.Millisecond)
-	done := make(chan struct{}, 1)
-	go func() {
-		for {
-			select {
-			case <-ticker:
-				fmt.Printf("\r\033[mDownloading backup %s. This may take awhile %s\033[m ", backupID, spinner.Next())
-			case <-done:
-				return
-			}
-		}
-	}()
-	tempURL, err := d.TempDownloadURL(backupID, service)
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	defer os.Remove(dir)
-	tmpFile, err := ioutil.TempFile(dir, "")
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	logrus.Debugf("Downloading to temporary file at %s", tmpFile.Name())
-
-	u, _ := url.Parse(tempURL.URL)
-	svc := s3.New(session.New(&aws.Config{Region: aws.String("us-east-1"), Credentials: credentials.AnonymousCredentials}))
-	req, resp := svc.GetObjectRequest(&s3.GetObjectInput{
-		Bucket: aws.String(strings.Split(u.Host, ".")[0]),
-		Key:    aws.String(strings.TrimLeft(u.Path, "/")),
-	})
-	req.HTTPRequest.URL.RawQuery = u.RawQuery
-	err = req.Send()
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		done <- struct{}{}
-		return err
-	}
-	tmpFile.Close()
-	done <- struct{}{}
-
-	logrus.Println("\nDecrypting...")
-	err = d.Crypto.DecryptFile(tmpFile.Name(), job.Backup.Key, job.Backup.IV, filePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return d.Export(filePath, job, service)
 }
 
 func (d *SDb) TempDownloadURL(jobID string, service *models.Service) (*models.TempURL, error) {

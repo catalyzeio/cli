@@ -144,6 +144,7 @@ var ImportSubCmd = models.Command{
 			filePath := subCmd.StringArg("FILEPATH", "", "The location of the file to import to the database")
 			mongoCollection := subCmd.StringOpt("c mongo-collection", "", "If importing into a mongo service, the name of the collection to import into")
 			mongoDatabase := subCmd.StringOpt("d mongo-database", "", "If importing into a mongo service, the name of the database to import into")
+			skipBackup := subCmd.BoolOpt("s skip-backup", false, "Skip backing up database. Useful for large databases, which can have long backup times.")
 			subCmd.Action = func() {
 				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
 					logrus.Fatal(err.Error())
@@ -151,12 +152,12 @@ var ImportSubCmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdImport(*databaseName, *filePath, *mongoCollection, *mongoDatabase, New(settings, crypto.New(), jobs.New(settings)), services.New(settings), jobs.New(settings))
+				err := CmdImport(*databaseName, *filePath, *mongoCollection, *mongoDatabase, *skipBackup, New(settings, crypto.New(), jobs.New(settings)), prompts.New(), services.New(settings), jobs.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "DATABASE_NAME FILEPATH [-d [-c]]"
+			subCmd.Spec = "DATABASE_NAME FILEPATH [-s][-d [-c]]"
 		}
 	},
 }
@@ -223,7 +224,7 @@ type IDb interface {
 	Export(filePath string, job *models.Job, service *models.Service) error
 	Import(filePath, mongoCollection, mongoDatabase string, service *models.Service) (*models.Job, error)
 	List(page, pageSize int, service *models.Service) (*[]models.Job, error)
-	TempUploadURL(service *models.Service) (*models.TempURL, error)
+	TempUploadAuth(service *models.Service) (*models.TempAuth, error)
 	TempDownloadURL(jobID string, service *models.Service) (*models.TempURL, error)
 	TempLogsURL(jobID string, serviceID string) (*models.TempURL, error)
 	DumpLogs(taskType string, job *models.Job, service *models.Service) error

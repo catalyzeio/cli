@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/private/protocol/restxml"
-	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
 // S3 is a client for Amazon S3.
@@ -39,16 +39,17 @@ const ServiceName = "s3"
 //     svc := s3.New(mySession, aws.NewConfig().WithRegion("us-west-2"))
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *S3 {
 	c := p.ClientConfig(ServiceName, cfgs...)
-	return newClient(*c.Config, c.Handlers, c.Endpoint, c.SigningRegion)
+	return newClient(*c.Config, c.Handlers, c.Endpoint, c.SigningRegion, c.SigningName)
 }
 
 // newClient creates, initializes and returns a new service client instance.
-func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegion string) *S3 {
+func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegion, signingName string) *S3 {
 	svc := &S3{
 		Client: client.New(
 			cfg,
 			metadata.ClientInfo{
 				ServiceName:   ServiceName,
+				SigningName:   signingName,
 				SigningRegion: signingRegion,
 				Endpoint:      endpoint,
 				APIVersion:    "2006-03-01",
@@ -58,7 +59,7 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	}
 
 	// Handlers
-	svc.Handlers.Sign.PushBack(v4.Sign)
+	svc.Handlers.Sign.PushBackNamed(v4.SignRequestHandler)
 	svc.Handlers.Build.PushBackNamed(restxml.BuildHandler)
 	svc.Handlers.Unmarshal.PushBackNamed(restxml.UnmarshalHandler)
 	svc.Handlers.UnmarshalMeta.PushBackNamed(restxml.UnmarshalMetaHandler)
