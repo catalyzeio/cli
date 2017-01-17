@@ -8,19 +8,16 @@ import (
 	"github.com/catalyzeio/cli/commands/services"
 )
 
-func CmdRake(svcName, taskName, defaultSvcID string, ir IRake, is services.IServices) error {
-	if svcName != "" {
-		service, err := is.RetrieveByLabel(svcName)
-		if err != nil {
-			return err
-		}
-		if service == nil {
-			return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
-		}
-		defaultSvcID = service.ID
+func CmdRake(svcName, taskName string, ir IRake, is services.IServices) error {
+	service, err := is.RetrieveByLabel(svcName)
+	if err != nil {
+		return err
+	}
+	if service == nil {
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
 	}
 	logrus.Printf("Executing Rake task: %s", taskName)
-	err := ir.Run(taskName, defaultSvcID)
+	err = ir.Run(taskName, service.ID)
 	if err != nil {
 		return err
 	}

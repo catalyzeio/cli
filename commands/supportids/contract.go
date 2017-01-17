@@ -29,7 +29,7 @@ var Cmd = models.Command{
 
 // ISupportIDs
 type ISupportIDs interface {
-	SupportIDs() (string, string, string, string, string, error)
+	SupportIDs() (string, string, string, string, error)
 }
 
 // SSupportIDs is a concrete implementation of ISupportIDs

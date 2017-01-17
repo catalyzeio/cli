@@ -3,9 +3,6 @@ package associate
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/catalyzeio/cli/commands/environments"
@@ -14,10 +11,7 @@ import (
 	"github.com/catalyzeio/cli/models"
 )
 
-func CmdAssociate(envLabel, svcLabel, alias, remote string, defaultEnv bool, ia IAssociate, ig git.IGit, ie environments.IEnvironments, is services.IServices) error {
-	if defaultEnv {
-		logrus.Warnln("The \"--default\" flag has been deprecated! It will be removed in a future version.")
-	}
+func CmdAssociate(envLabel, alias, remote string, ia IAssociate, ig git.IGit, ie environments.IEnvironments, is services.IServices) error {
 	if !ig.Exists() {
 		return errors.New("No git repo found in the current directory")
 	}
@@ -48,61 +42,23 @@ func CmdAssociate(envLabel, svcLabel, alias, remote string, defaultEnv bool, ia 
 		return fmt.Errorf("No services found for environment with name \"%s\"", envLabel)
 	}
 
-	var chosenService *models.Service
-	availableCodeServices := []string{}
-	for _, service := range *svcs {
-		if service.Type == "code" {
-			if service.Label == svcLabel {
-				chosenService = &service
-				break
-			}
-			availableCodeServices = append(availableCodeServices, service.Label)
-		}
-	}
-	if chosenService == nil {
-		return fmt.Errorf("No code service found with label \"%s\". Code services found: %s", svcLabel, strings.Join(availableCodeServices, ", "))
-	}
-	remotes, err := ig.List()
-	if err != nil {
-		return err
-	}
-	for _, r := range remotes {
-		if r == remote {
-			ig.Rm(remote)
-			break
-		}
-	}
-	err = ig.Add(remote, chosenService.Source)
-	if err != nil {
-		return err
-	}
-	logrus.Printf("\"%s\" remote added.", remote)
-
 	name := alias
 	if name == "" {
 		name = envLabel
 	}
-	err = ia.Associate(name, remote, defaultEnv, e, chosenService)
+	err = ia.Associate(name, remote, e)
 	if err != nil {
 		return err
 	}
-	logrus.Printf("Your git repository \"%s\" has been associated with code service \"%s\" and environment \"%s\"", remote, svcLabel, name)
-	logrus.Println("After associating to an environment, you need to add a cert with the \"catalyze certs create\" command, if you have not done so already")
+	logrus.Println("After associating to an environment, you need to add a git repository with the \"catalyze git-remote add\" command and add a cert with the \"catalyze certs create\" command, if you have not done so already")
 	return nil
 }
 
 // Associate an environment so that commands can be run against it. This command
 // no longer adds a git remote. See commands.AddRemote().
-func (s *SAssociate) Associate(name, remote string, defaultEnv bool, env *models.Environment, chosenService *models.Service) error {
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		return err
-	}
-
-	s.Settings.Environments[name] = models.AssociatedEnv{
+func (s *SAssociate) Associate(name, remote string, env *models.Environment) error {
+	s.Settings.Environments[name] = models.AssociatedEnvV2{
 		EnvironmentID: env.ID,
-		ServiceID:     chosenService.ID,
-		Directory:     dir,
 		Name:          env.Name,
 		Pod:           env.Pod,
 		OrgID:         env.OrgID,

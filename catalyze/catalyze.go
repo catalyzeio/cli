@@ -14,7 +14,6 @@ import (
 	"github.com/catalyzeio/cli/commands/console"
 	"github.com/catalyzeio/cli/commands/dashboard"
 	"github.com/catalyzeio/cli/commands/db"
-	"github.com/catalyzeio/cli/commands/default"
 	"github.com/catalyzeio/cli/commands/deploykeys"
 	"github.com/catalyzeio/cli/commands/disassociate"
 	"github.com/catalyzeio/cli/commands/domain"
@@ -158,7 +157,11 @@ func InitGlobalOpts(app *cli.Cli, settings *models.Settings) {
 		config.SaveSettings(settings)
 	}
 
-	versionString := fmt.Sprintf("version %s %s", config.VERSION, config.ArchString())
+	betaString := ""
+	if config.Beta {
+		betaString = "-BETA"
+	}
+	versionString := fmt.Sprintf("version %s%s %s", config.VERSION, betaString, config.ArchString())
 	logrus.Debugln(versionString)
 	app.Version("v version", versionString)
 }
@@ -179,7 +182,6 @@ func InitCLI(app *cli.Cli, settings *models.Settings) {
 	app.CommandLong(console.Cmd.Name, console.Cmd.ShortHelp, console.Cmd.LongHelp, console.Cmd.CmdFunc(settings))
 	app.CommandLong(dashboard.Cmd.Name, dashboard.Cmd.ShortHelp, dashboard.Cmd.LongHelp, dashboard.Cmd.CmdFunc(settings))
 	app.CommandLong(db.Cmd.Name, db.Cmd.ShortHelp, db.Cmd.LongHelp, db.Cmd.CmdFunc(settings))
-	app.CommandLong(defaultcmd.Cmd.Name, defaultcmd.Cmd.ShortHelp, defaultcmd.Cmd.LongHelp, defaultcmd.Cmd.CmdFunc(settings))
 	app.CommandLong(deploykeys.Cmd.Name, deploykeys.Cmd.ShortHelp, deploykeys.Cmd.LongHelp, deploykeys.Cmd.CmdFunc(settings))
 	app.CommandLong(disassociate.Cmd.Name, disassociate.Cmd.ShortHelp, disassociate.Cmd.LongHelp, disassociate.Cmd.CmdFunc(settings))
 	app.CommandLong(domain.Cmd.Name, domain.Cmd.ShortHelp, domain.Cmd.LongHelp, domain.Cmd.CmdFunc(settings))

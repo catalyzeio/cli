@@ -53,12 +53,12 @@ var ListSubCmd = models.Command{
 				} else {
 					formatter = &PlainFormatter{}
 				}
-				err := CmdList(*serviceName, settings.ServiceID, formatter, New(settings), services.New(settings))
+				err := CmdList(*serviceName, formatter, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "[SERVICE_NAME] [--json | --yaml]"
+			subCmd.Spec = "SERVICE_NAME [--json | --yaml]"
 		}
 	},
 }
@@ -87,12 +87,12 @@ var SetSubCmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdSet(*serviceName, settings.ServiceID, *variables, New(settings), services.New(settings))
+				err := CmdSet(*serviceName, *variables, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "[SERVICE_NAME] -v..."
+			subCmd.Spec = "SERVICE_NAME -v..."
 		}
 	},
 }
@@ -116,12 +116,12 @@ var UnsetSubCmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdUnset(*serviceName, settings.ServiceID, *variable, New(settings), services.New(settings))
+				err := CmdUnset(*serviceName, *variable, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "[SERVICE_NAME] VARIABLE"
+			subCmd.Spec = "SERVICE_NAME VARIABLE"
 		}
 	},
 }

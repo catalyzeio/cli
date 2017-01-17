@@ -48,20 +48,15 @@ func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authH
 	var settings models.Settings
 	json.NewDecoder(file).Decode(&settings)
 	if settings.Environments == nil {
-		settings.Environments = make(map[string]models.AssociatedEnv)
+		settings.Environments = make(map[string]models.AssociatedEnvV2)
 	}
 
 	// try and set the given env first, if it exists
 	if envName != "" {
 		setGivenEnv(envName, &settings)
-		if settings.EnvironmentID == "" || settings.ServiceID == "" {
+		if settings.EnvironmentID == "" {
 			logrus.Fatalf("No environment named \"%s\" has been associated. Run \"catalyze associated\" to see what environments have been associated or run \"catalyze associate\" from a local git repo to create a new association", envName)
 		}
-	}
-
-	// if not given, try default. this is deprecated and will be removed soon
-	if settings.EnvironmentID == "" || settings.ServiceID == "" {
-		setGivenEnv(settings.Default, &settings)
 	}
 
 	settings.AccountsHost = accountsHost
@@ -90,7 +85,6 @@ func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authH
 	logrus.Debugf("Environment ID: %s", settings.EnvironmentID)
 	logrus.Debugf("Environment Name: %s", settings.EnvironmentName)
 	logrus.Debugf("Pod: %s", settings.Pod)
-	logrus.Debugf("Service ID: %s", settings.ServiceID)
 	logrus.Debugf("Org ID: %s", settings.OrgID)
 
 	settings.Version = VERSION
@@ -130,7 +124,6 @@ func setGivenEnv(envName string, settings *models.Settings) {
 	for eName, e := range settings.Environments {
 		if eName == envName {
 			settings.EnvironmentID = e.EnvironmentID
-			settings.ServiceID = e.ServiceID
 			settings.Pod = e.Pod
 			settings.EnvironmentName = envName
 			settings.OrgID = e.OrgID
@@ -166,7 +159,7 @@ func defaultEnvPrompt(envName string) error {
 // given settings object before a command is run. This is intended to be called
 // before every command.
 func CheckRequiredAssociation(required, prompt bool, settings *models.Settings) error {
-	if required && (settings.EnvironmentID == "" || settings.ServiceID == "") {
+	if required && settings.EnvironmentID == "" {
 		err := ErrEnvRequired
 		if prompt {
 			for _, e := range settings.Environments {

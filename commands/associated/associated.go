@@ -14,11 +14,9 @@ func CmdAssociated(ia IAssociated) error {
 		logrus.Printf(`%s:
     Environment ID:   %s
     Environment Name: %s
-    Service ID:       %s
-    Associated at:    %s
     Pod:              %s
     Organization ID:  %s
-`, envAlias, env.EnvironmentID, env.Name, env.ServiceID, env.Directory, env.Pod, env.OrgID)
+`, envAlias, env.EnvironmentID, env.Name, env.Pod, env.OrgID)
 	}
 	if len(envs) == 0 {
 		logrus.Println("No environments have been associated")
@@ -27,6 +25,6 @@ func CmdAssociated(ia IAssociated) error {
 }
 
 // Associated lists all currently associated environments.
-func (a *SAssociated) Associated() (map[string]models.AssociatedEnv, error) {
+func (a *SAssociated) Associated() (map[string]models.AssociatedEnvV2, error) {
 	return a.Settings.Environments, nil
 }

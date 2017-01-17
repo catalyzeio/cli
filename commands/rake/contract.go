@@ -29,12 +29,12 @@ var Cmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdRake(*serviceName, *taskName, settings.ServiceID, New(settings), services.New(settings))
+				err := CmdRake(*serviceName, *taskName, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			cmd.Spec = "[SERVICE_NAME] TASK_NAME"
+			cmd.Spec = "SERVICE_NAME TASK_NAME"
 		}
 	},
 }

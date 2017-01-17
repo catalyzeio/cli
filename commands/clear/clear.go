@@ -6,10 +6,7 @@ import (
 	"github.com/catalyzeio/cli/models"
 )
 
-func CmdClear(privateKey, session, environments, defaultEnv, pods bool, settings *models.Settings) error {
-	if defaultEnv {
-		logrus.Warnln("The \"--default\" flag has been deprecated! It will be removed in a future version.")
-	}
+func CmdClear(privateKey, session, environments, pods bool, settings *models.Settings) error {
 	if privateKey {
 		settings.PrivateKeyPath = ""
 	}
@@ -18,16 +15,13 @@ func CmdClear(privateKey, session, environments, defaultEnv, pods bool, settings
 		settings.UsersID = ""
 	}
 	if environments {
-		settings.Environments = map[string]models.AssociatedEnv{}
-	}
-	if defaultEnv {
-		settings.Default = ""
+		settings.Environments = map[string]models.AssociatedEnvV2{}
 	}
 	if pods {
 		settings.Pods = &[]models.Pod{}
 	}
 	config.SaveSettings(settings)
-	if !privateKey && !session && !environments && !defaultEnv && !pods {
+	if !privateKey && !session && !environments && !pods {
 		logrus.Println("No settings were specified. To see available options, run \"catalyze clear --help\"")
 	} else {
 		logrus.Println("All specified settings have been cleared")

@@ -23,7 +23,6 @@ var Cmd = models.Command{
 			privateKey := cmd.BoolOpt("private-key", false, "Clear out the saved private key information")
 			session := cmd.BoolOpt("session", false, "Clear out all session information")
 			envs := cmd.BoolOpt("environments", false, "Clear out all associated environments")
-			defaultEnv := cmd.BoolOpt("default", false, "[DEPRECATED] Clear out the saved default environment")
 			pods := cmd.BoolOpt("pods", false, "Clear out all saved pods")
 			all := cmd.BoolOpt("all", false, "Clear out all settings")
 			cmd.Action = func() {
@@ -31,15 +30,14 @@ var Cmd = models.Command{
 					*privateKey = true
 					*session = true
 					*envs = true
-					*defaultEnv = true
 					*pods = true
 				}
-				err := CmdClear(*privateKey, *session, *envs, *defaultEnv, *pods, settings)
+				err := CmdClear(*privateKey, *session, *envs, *pods, settings)
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			cmd.Spec = "[--private-key] [--session] [--environments] [--default] [--pods] [--all]"
+			cmd.Spec = "[--private-key] [--session] [--environments] [--pods] [--all]"
 		}
 	},
 }

@@ -22,27 +22,25 @@ var Cmd = models.Command{
 	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
 		return func(cmd *cli.Cmd) {
 			envName := cmd.StringArg("ENV_NAME", "", "The name of your environment")
-			serviceName := cmd.StringArg("SERVICE_NAME", "", "The name of the primary code service to associate with this environment (i.e. 'app01')")
 			alias := cmd.StringOpt("a alias", "", "A shorter name to reference your environment by for local commands")
 			remote := cmd.StringOpt("r remote", "catalyze", "The name of the remote")
-			defaultEnv := cmd.BoolOpt("d default", false, "[DEPRECATED] Specifies whether or not the associated environment will be the default")
 			cmd.Action = func() {
 				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdAssociate(*envName, *serviceName, *alias, *remote, *defaultEnv, New(settings), git.New(), environments.New(settings), services.New(settings))
+				err := CmdAssociate(*envName, *alias, *remote, New(settings), git.New(), environments.New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			cmd.Spec = "ENV_NAME SERVICE_NAME [-a] [-r] [-d]"
+			cmd.Spec = "ENV_NAME [-a] [-r]"
 		}
 	},
 }
 
 // interfaces are the API calls
 type IAssociate interface {
-	Associate(name, remote string, defaultEnv bool, env *models.Environment, chosenService *models.Service) error
+	Associate(name, remote string, env *models.Environment) error
 }
 
 // SAssociate is a concrete implementation of IAssociate

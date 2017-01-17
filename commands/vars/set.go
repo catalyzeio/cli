@@ -10,16 +10,13 @@ import (
 	"github.com/catalyzeio/cli/commands/services"
 )
 
-func CmdSet(svcName, defaultSvcID string, variables []string, iv IVars, is services.IServices) error {
-	if svcName != "" {
-		service, err := is.RetrieveByLabel(svcName)
-		if err != nil {
-			return err
-		}
-		if service == nil {
-			return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
-		}
-		defaultSvcID = service.ID
+func CmdSet(svcName string, variables []string, iv IVars, is services.IServices) error {
+	service, err := is.RetrieveByLabel(svcName)
+	if err != nil {
+		return err
+	}
+	if service == nil {
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
 	}
 	envVarsMap := make(map[string]string, len(variables))
 	r := regexp.MustCompile("^[a-zA-Z_]+[a-zA-Z0-9_]*$")
@@ -35,13 +32,11 @@ func CmdSet(svcName, defaultSvcID string, variables []string, iv IVars, is servi
 		envVarsMap[name] = value
 	}
 
-	err := iv.Set(defaultSvcID, envVarsMap)
+	err = iv.Set(service.ID, envVarsMap)
 	if err != nil {
 		return err
 	}
-	// TODO add in the service label in the redeploy example once we take in the service label in
-	// this command
-	logrus.Println("Set. For these environment variables to take effect, you will need to redeploy your service with \"catalyze redeploy\"")
+	logrus.Printf("Set. For these environment variables to take effect, you will need to redeploy your service with \"catalyze redeploy %s\"", svcName)
 	return nil
 }
 

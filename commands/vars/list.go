@@ -54,18 +54,15 @@ func (p *PlainFormatter) Output(envVars map[string]string) error {
 	return nil
 }
 
-func CmdList(svcName, defaultSvcID string, formatter Formatter, iv IVars, is services.IServices) error {
-	if svcName != "" {
-		service, err := is.RetrieveByLabel(svcName)
-		if err != nil {
-			return err
-		}
-		if service == nil {
-			return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
-		}
-		defaultSvcID = service.ID
+func CmdList(svcName string, formatter Formatter, iv IVars, is services.IServices) error {
+	service, err := is.RetrieveByLabel(svcName)
+	if err != nil {
+		return err
 	}
-	envVars, err := iv.List(defaultSvcID)
+	if service == nil {
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+	}
+	envVars, err := iv.List(service.ID)
 	if err != nil {
 		return err
 	}
