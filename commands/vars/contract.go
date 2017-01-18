@@ -80,6 +80,7 @@ var SetSubCmd = models.Command{
 				Desc:      "The env variable to set or update in the form \"<key>=<value>\"",
 				HideValue: true,
 			})
+			fileName := subCmd.StringOpt("f file", "", "The path to a file to import environment variables from. This file can be in JSON, YAML, or KEY=VALUE format")
 			subCmd.Action = func() {
 				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
 					logrus.Fatal(err.Error())
@@ -87,12 +88,12 @@ var SetSubCmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdSet(*serviceName, *variables, New(settings), services.New(settings))
+				err := CmdSet(*serviceName, *variables, *fileName, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "SERVICE_NAME -v..."
+			subCmd.Spec = "SERVICE_NAME (-v... | -f)"
 		}
 	},
 }
@@ -108,7 +109,12 @@ var UnsetSubCmd = models.Command{
 	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
 		return func(subCmd *cli.Cmd) {
 			serviceName := subCmd.StringArg("SERVICE_NAME", "", "The name of the service on which the environment variables will be unset. Defaults to the associated service.")
-			variable := subCmd.StringArg("VARIABLE", "", "The name of the environment variable to unset")
+			variables := subCmd.Strings(cli.StringsOpt{
+				Name:      "v variable",
+				Value:     []string{},
+				Desc:      "The names of environment variables to unset",
+				HideValue: true,
+			})
 			subCmd.Action = func() {
 				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
 					logrus.Fatal(err.Error())
@@ -116,12 +122,12 @@ var UnsetSubCmd = models.Command{
 				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
 					logrus.Fatal(err.Error())
 				}
-				err := CmdUnset(*serviceName, *variable, New(settings), services.New(settings))
+				err := CmdUnset(*serviceName, *variables, New(settings), services.New(settings))
 				if err != nil {
 					logrus.Fatal(err.Error())
 				}
 			}
-			subCmd.Spec = "SERVICE_NAME VARIABLE"
+			subCmd.Spec = "SERVICE_NAME -v..."
 		}
 	},
 }

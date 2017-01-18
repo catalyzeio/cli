@@ -14,12 +14,13 @@ import (
 // IPrompts is the interface in which to interact with the user and accept
 // input.
 type IPrompts interface {
-	UsernamePassword() (string, string, error)
+	UsernamePassword(existingUsername, existingPassword string) (string, string, error)
 	KeyPassphrase(string) string
 	Password(msg string) string
 	PHI() error
-	YesNo(msg string) error
+	YesNo(msg, prompt string) error
 	OTP(string) string
+	GenericPrompt(msg, prompt string, validOptions []string) string
 }
 
 // SPrompts is a concrete implementation of IPrompts
@@ -30,30 +31,30 @@ func New() IPrompts {
 	return &SPrompts{}
 }
 
-var validAnswers = map[string]bool{
-	"y":   true,
-	"yes": true,
-	"n":   false,
-	"no":  false,
-}
-
 // UsernamePassword prompts a user to enter their username and password.
-func (p *SPrompts) UsernamePassword() (string, string, error) {
-	var username string
-	fmt.Print("Username or Email: ")
-	in := bufio.NewReader(os.Stdin)
-	username, err := in.ReadString('\n')
-	if err != nil {
-		return "", "", errors.New("Invalid username")
+func (p *SPrompts) UsernamePassword(existingUsername, existingPassword string) (string, string, error) {
+	username := existingUsername
+	var err error
+	if username == "" {
+		fmt.Print("Username or Email: ")
+		in := bufio.NewReader(os.Stdin)
+		username, err = in.ReadString('\n')
+		if err != nil {
+			return "", "", errors.New("Invalid username")
+		}
+		username = strings.TrimRight(username, "\n")
+		if runtime.GOOS == "windows" {
+			username = strings.TrimRight(username, "\r")
+		}
 	}
-	username = strings.TrimRight(username, "\n")
-	if runtime.GOOS == "windows" {
-		username = strings.TrimRight(username, "\r")
+	password := existingPassword
+	if password == "" {
+		fmt.Print("Password: ")
+		bytes, _ := terminal.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println("")
+		password = string(bytes)
 	}
-	fmt.Print("Password: ")
-	bytes, _ := terminal.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println("")
-	return username, string(bytes), nil
+	return username, password, nil
 }
 
 // KeyPassphrase prompts a user to enter a passphrase for a named key.
@@ -67,20 +68,14 @@ func (p *SPrompts) KeyPassphrase(filepath string) string {
 // PHI prompts a user to accept liability for downloading PHI to their local
 // machine.
 func (p *SPrompts) PHI() error {
-	var answer string
-	for {
-		fmt.Println("This operation might result in PHI data being downloaded and decrypted to your local machine. By entering \"y\" at the prompt below, you warrant that you have the necessary privileges to view the data, have taken all necessary precautions to secure this data, and absolve Catalyze of any issues that might arise from its loss.")
-		fmt.Print("Do you wish to proceed? (y/n) ")
-		fmt.Scanln(&answer)
-		fmt.Println("")
-		if _, contains := validAnswers[strings.ToLower(answer)]; !contains {
-			fmt.Printf("%s is not a valid option. Please enter 'y' or 'n'\n", answer)
-		} else {
-			break
+	acceptAnswers := []string{"y", "yes"}
+	denyAnswers := []string{"n", "no"}
+
+	answer := p.GenericPrompt("This operation might result in PHI data being downloaded and decrypted to your local machine. By entering \"y\" at the prompt below, you warrant that you have the necessary privileges to view the data, have taken all necessary precautions to secure this data, and absolve Catalyze of any issues that might arise from its loss.", "Do you wish to proceed? (y/n) ", append(acceptAnswers, denyAnswers...))
+	for _, denyAnswer := range denyAnswers {
+		if denyAnswer == strings.ToLower(answer) {
+			return fmt.Errorf("Exiting")
 		}
-	}
-	if !validAnswers[strings.ToLower(answer)] {
-		return fmt.Errorf("Exiting")
 	}
 	return nil
 }
@@ -91,20 +86,15 @@ func (p *SPrompts) PHI() error {
 // indicating that the user needs to type in y or n. This method does not do
 // that for you. The message will not have a new line appended to it. If you
 // require a newline, add this to the given message.
-func (p *SPrompts) YesNo(msg string) error {
-	var answer string
-	for {
-		fmt.Printf(msg)
-		fmt.Scanln(&answer)
-		fmt.Println("")
-		if _, contains := validAnswers[strings.ToLower(answer)]; !contains {
-			fmt.Printf("%s is not a valid option. Please enter 'y' or 'n'\n", answer)
-		} else {
-			break
+func (p *SPrompts) YesNo(msg, prompt string) error {
+	acceptAnswers := []string{"y", "yes"}
+	denyAnswers := []string{"n", "no"}
+
+	answer := p.GenericPrompt(msg, prompt, append(acceptAnswers, denyAnswers...))
+	for _, denyAnswer := range denyAnswers {
+		if denyAnswer == strings.ToLower(answer) {
+			return fmt.Errorf("Exiting")
 		}
-	}
-	if !validAnswers[strings.ToLower(answer)] {
-		return fmt.Errorf("Exiting")
 	}
 	return nil
 }
@@ -132,4 +122,29 @@ func (p *SPrompts) OTP(preferredMode string) string {
 	var token string
 	fmt.Scanln(&token)
 	return strings.TrimSpace(token)
+}
+
+// GenericPrompt prompts the user and validates the input against the list of
+// given case-insensitive valid options. The user's choice is returned.
+func (p *SPrompts) GenericPrompt(msg, prompt string, validOptions []string) string {
+	var answer string
+	fmt.Println(msg)
+	for {
+		fmt.Printf(prompt)
+		fmt.Scanln(&answer)
+		fmt.Println("")
+		valid := false
+		for _, choice := range validOptions {
+			if strings.ToLower(choice) == strings.ToLower(answer) {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			fmt.Printf("%s is not a valid option. Please enter one of %s\n", answer, strings.Join(validOptions, ", "))
+		} else {
+			break
+		}
+	}
+	return answer
 }

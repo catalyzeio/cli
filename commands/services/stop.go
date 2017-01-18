@@ -11,7 +11,7 @@ import (
 // CmdStop stops all instances of a given service. All workers and rake tasks will also be stopped
 // if applicable.
 func CmdStop(svcName string, is IServices, ij jobs.IJobs, ip prompts.IPrompts) error {
-	err := ip.YesNo(fmt.Sprintf("Are you sure you want to stop %s? This will stop all instances of the service, all workers, all rake tasks, and all currently open consoles. (y/n) ", svcName))
+	err := ip.YesNo(fmt.Sprintf("Stopping %s will stop all instances of the service, all workers, all rake tasks, and all currently open consoles.", svcName), fmt.Sprintf("Are you sure you want to stop %s? (y/n) ", svcName))
 	if err != nil {
 		return err
 	}

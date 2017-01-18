@@ -46,7 +46,7 @@ func CmdScale(svcName, target, scaleString string, iw IWorker, is services.IServ
 		}
 		logrus.Printf("Successfully deployed %d new workers with target %s for service %s and set the scale to %d", scale-existingScale, target, svcName, scale)
 	} else if scale < existingScale {
-		err = ip.YesNo(fmt.Sprintf("Scaling down the %s target from %d to %d for service %s will automatically stop %d jobs, would you like to proceed? (y/n) ", target, existingScale, scale, svcName, existingScale-scale))
+		err = ip.YesNo(fmt.Sprintf("Scaling down the %s target from %d to %d for service %s will automatically stop %d jobs.", target, existingScale, scale, svcName, existingScale-scale), "Would you like to proceed? (y/n) ")
 		if err != nil {
 			return err
 		}

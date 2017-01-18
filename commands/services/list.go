@@ -52,20 +52,6 @@ func (s *SServices) ListByEnvID(envID, podID string) (*[]models.Service, error) 
 	return &services, nil
 }
 
-func (s *SServices) Retrieve(svcID string) (*models.Service, error) {
-	headers := s.Settings.HTTPManager.GetHeaders(s.Settings.SessionToken, s.Settings.Version, s.Settings.Pod, s.Settings.UsersID)
-	resp, statusCode, err := s.Settings.HTTPManager.Get(nil, fmt.Sprintf("%s%s/environments/%s/services/%s", s.Settings.PaasHost, s.Settings.PaasHostVersion, s.Settings.EnvironmentID, svcID), headers)
-	if err != nil {
-		return nil, err
-	}
-	var service models.Service
-	err = s.Settings.HTTPManager.ConvertResp(resp, statusCode, &service)
-	if err != nil {
-		return nil, err
-	}
-	return &service, nil
-}
-
 func (s *SServices) RetrieveByLabel(label string) (*models.Service, error) {
 	services, err := s.List()
 	if err != nil {

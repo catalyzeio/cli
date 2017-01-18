@@ -7,7 +7,7 @@ import (
 	"github.com/catalyzeio/cli/commands/services"
 )
 
-func CmdUnset(svcName, key string, iv IVars, is services.IServices) error {
+func CmdUnset(svcName string, variables []string, iv IVars, is services.IServices) error {
 	service, err := is.RetrieveByLabel(svcName)
 	if err != nil {
 		return err
@@ -15,7 +15,9 @@ func CmdUnset(svcName, key string, iv IVars, is services.IServices) error {
 	if service == nil {
 		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
 	}
-	err = iv.Unset(service.ID, key)
+	for _, variable := range variables {
+		err = iv.Unset(service.ID, variable)
+	}
 	if err != nil {
 		return err
 	}

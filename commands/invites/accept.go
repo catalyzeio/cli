@@ -14,7 +14,7 @@ func CmdAccept(inviteCode string, ii IInvites, ia auth.IAuth, ip prompts.IPrompt
 	if err != nil {
 		return err
 	}
-	err = ip.YesNo(fmt.Sprintf("Are you sure you want to accept this org invitation as %s? (y/n) ", user.Email))
+	err = ip.YesNo("", fmt.Sprintf("Are you sure you want to accept this org invitation as %s? (y/n) ", user.Email))
 	if err != nil {
 		return err
 	}

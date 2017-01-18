@@ -2,6 +2,19 @@ package models
 
 import "github.com/jault3/mow.cli"
 
+type AutoUpdate int
+
+const (
+	// AutoUpdateUnspecified will ask the user how they would like to handle updates on the next command
+	AutoUpdateUnspecified AutoUpdate = iota
+	// AutoUpdateAlways will automatically update the CLI when an update is available
+	AutoUpdateAlways
+	// AutoUpdatePrompt will prompt the user once per available update
+	AutoUpdatePrompt
+	// AutoUpdateNever will never notify of available CLI updates
+	AutoUpdateNever
+)
+
 // AssociatedEnvV1 holds information about an associated environment
 type AssociatedEnvV1 struct {
 	EnvironmentID string `json:"environmentId"`
@@ -334,6 +347,7 @@ type SettingsV2 struct {
 	Pods            *[]Pod                     `json:"pods"`
 	PodCheck        int64                      `json:"pod_check"`
 	Format          string                     `json:"format"`
+	AutoUpdateOptIn AutoUpdate                 `json:"auto_update"`
 }
 
 type Site struct {

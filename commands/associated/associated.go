@@ -19,7 +19,7 @@ func CmdAssociated(ia IAssociated) error {
 `, envAlias, env.EnvironmentID, env.Name, env.Pod, env.OrgID)
 	}
 	if len(envs) == 0 {
-		logrus.Println("No environments have been associated")
+		logrus.Println("No environments have been associated. Run \"catalyze associate\" to get started.")
 	}
 	return nil
 }

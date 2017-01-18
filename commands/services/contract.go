@@ -123,7 +123,6 @@ var StopSubCmd = models.Command{
 type IServices interface {
 	List() (*[]models.Service, error)
 	ListByEnvID(envID, podID string) (*[]models.Service, error)
-	Retrieve(svcID string) (*models.Service, error)
 	RetrieveByLabel(label string) (*models.Service, error)
 	Update(svcID string, updates map[string]string) error
 }

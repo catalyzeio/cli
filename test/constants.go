@@ -2,7 +2,13 @@ package test
 
 const (
 	BinaryName = "cli"
-	EnvLabel   = "cli-integration-tests"
-	SvcLabel   = "code-1"
-	Alias      = "ctest"
+
+	Alias     = "ctest"
+	EnvID     = "env1"
+	EnvName   = "cli-integration-tests"
+	Namespace = "pod011234"
+	OrgID     = "org1"
+	Pod       = "pod1"
+	SvcID     = "svc1"
+	SvcLabel  = "code-1"
 )

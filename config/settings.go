@@ -13,15 +13,23 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-// SettingsPath is the location of the catalyze config file.
-const SettingsFile = ".catalyze"
+const (
+	settingsFormatV1 = "v1"
+	settingsFormatV2 = "v2"
+)
+
+const (
+	// SettingsFile is the name of the catalyze config file.
+	SettingsFile  = ".catalyze"
+	currentFormat = settingsFormatV2
+)
 
 // SettingsRetriever defines an interface for a class responsible for generating
 // a settings object used for most commands in the CLI. Some examples might be
 // for retrieving settings based on the settings file or generating a settings
 // object based on a directly entered environment ID and service ID.
 type SettingsRetriever interface {
-	GetSettings(string, string, string, string, string, string, string, string, string) *models.Settings
+	GetSettings(string, string, string, string, string, string, string, string, string) (*models.Settings, error)
 }
 
 // FileSettingsRetriever reads in data from the SettingsFile and generates a
@@ -29,11 +37,10 @@ type SettingsRetriever interface {
 type FileSettingsRetriever struct{}
 
 // GetSettings returns a Settings object for the current context
-func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authHost, ignoreAuthHostVersion, paasHost, ignorePaasHostVersion, username, password string) *models.Settings {
+func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authHost, ignoreAuthHostVersion, paasHost, ignorePaasHostVersion, username, password string) (*models.Settings, error) {
 	HomeDir, err := homedir.Dir()
 	if err != nil {
-		logrus.Println(err.Error())
-		os.Exit(1)
+		return nil, err
 	}
 
 	file, err := os.Open(filepath.Join(HomeDir, SettingsFile))
@@ -42,11 +49,20 @@ func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authH
 	}
 	defer file.Close()
 	if err != nil {
-		logrus.Println(err.Error())
-		os.Exit(1)
+		return nil, err
 	}
 	var settings models.Settings
 	json.NewDecoder(file).Decode(&settings)
+	if settings.Format != currentFormat {
+		if settings.Format == "" {
+			settings.Format = "v1"
+		}
+		file.Seek(0, 0)
+		settings, err = migrateSettings(file, settings.Format, currentFormat)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if settings.Environments == nil {
 		settings.Environments = make(map[string]models.AssociatedEnvV2)
 	}
@@ -88,22 +104,49 @@ func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authH
 	logrus.Debugf("Org ID: %s", settings.OrgID)
 
 	settings.Version = VERSION
-	return &settings
+	return &settings, nil
+}
+
+func migrateSettings(file *os.File, oldFormat, newFormat string) (models.Settings, error) {
+	if oldFormat == "v1" {
+		return migrateFromV1(file)
+	}
+	return models.Settings{}, fmt.Errorf("Invalid or corrupt settings file. Please fix the %s file in your home directory or contact Catalyze support", SettingsFile)
+}
+
+func migrateFromV1(file *os.File) (models.Settings, error) {
+	logrus.Debugf("Migrating settings from %s to %s", settingsFormatV1, currentFormat)
+	var oldSettings models.SettingsV1
+	json.NewDecoder(file).Decode(&oldSettings)
+	newSettings := models.Settings{
+		PrivateKeyPath:  oldSettings.PrivateKeyPath,
+		SessionToken:    oldSettings.SessionToken,
+		UsersID:         oldSettings.UsersID,
+		Environments:    map[string]models.AssociatedEnvV2{},
+		Pods:            oldSettings.Pods,
+		PodCheck:        oldSettings.PodCheck,
+		Format:          currentFormat,
+		AutoUpdateOptIn: models.AutoUpdateUnspecified,
+	}
+	for envName, env := range oldSettings.Environments {
+		newSettings.Environments[envName] = models.AssociatedEnvV2{
+			EnvironmentID: env.EnvironmentID,
+			Name:          env.Name,
+			Pod:           env.Pod,
+			OrgID:         env.OrgID,
+		}
+	}
+	return newSettings, nil
 }
 
 // SaveSettings persists the settings to disk
-func SaveSettings(settings *models.Settings) {
+func SaveSettings(settings *models.Settings) error {
 	HomeDir, err := homedir.Dir()
 	if err != nil {
-		logrus.Println(err.Error())
-		os.Exit(1)
+		return err
 	}
 	b, _ := json.Marshal(&settings)
-	err = ioutil.WriteFile(filepath.Join(HomeDir, SettingsFile), b, 0644)
-	if err != nil {
-		logrus.Println(err.Error())
-		os.Exit(1)
-	}
+	return ioutil.WriteFile(filepath.Join(HomeDir, SettingsFile), b, 0644)
 }
 
 // DeleteBreadcrumb removes the environment in the  global list

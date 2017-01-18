@@ -17,7 +17,7 @@ func CmdRm(svcName, target string, iw IWorker, is services.IServices, ip prompts
 	if service == nil {
 		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
-	err = ip.YesNo(fmt.Sprintf("Removing the worker target %s for service %s will automatically stop all existing worker jobs with that target, would you like to proceed? (y/n) ", target, svcName))
+	err = ip.YesNo(fmt.Sprintf("Removing the worker target %s for service %s will automatically stop all existing worker jobs with that target.", target, svcName), "Would you like to proceed? (y/n) ")
 	if err != nil {
 		return err
 	}

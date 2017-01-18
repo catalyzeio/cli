@@ -2,34 +2,46 @@ package vars
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
+
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/catalyzeio/cli/commands/services"
 )
 
-func CmdSet(svcName string, variables []string, iv IVars, is services.IServices) error {
+func CmdSet(svcName string, variables []string, fileName string, iv IVars, is services.IServices) error {
+	var envVarsMap map[string]string
+	var err error
+	if fileName != "" {
+		if _, err = os.Stat(fileName); err != nil {
+			return fmt.Errorf("A file does not exist at path '%s'", fileName)
+		}
+		fileData, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			return err
+		}
+		envVarsMap, err = parseFileData(fileData)
+		if err != nil {
+			return err
+		}
+	} else {
+		envVarsMap, err = parseKeyValue(variables)
+		if err != nil {
+			return err
+		}
+	}
 	service, err := is.RetrieveByLabel(svcName)
 	if err != nil {
 		return err
 	}
 	if service == nil {
 		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
-	}
-	envVarsMap := make(map[string]string, len(variables))
-	r := regexp.MustCompile("^[a-zA-Z_]+[a-zA-Z0-9_]*$")
-	for _, envVar := range variables {
-		pieces := strings.SplitN(envVar, "=", 2)
-		if len(pieces) != 2 {
-			return fmt.Errorf("Invalid variable format. Expected <key>=<value> but got %s", envVar)
-		}
-		name, value := pieces[0], pieces[1]
-		if !r.MatchString(name) {
-			return fmt.Errorf("Invalid environment variable name '%s'. Environment variable names must only contain letters, numbers, and underscores and must not start with a number.", name)
-		}
-		envVarsMap[name] = value
 	}
 
 	err = iv.Set(service.ID, envVarsMap)
@@ -38,6 +50,53 @@ func CmdSet(svcName string, variables []string, iv IVars, is services.IServices)
 	}
 	logrus.Printf("Set. For these environment variables to take effect, you will need to redeploy your service with \"catalyze redeploy %s\"", svcName)
 	return nil
+}
+
+func parseFileData(fileData []byte) (map[string]string, error) {
+	envVarsMap, err := parseYAML(fileData)
+	if err != nil {
+		envVarsMap, err = parseJSON(fileData)
+		if err != nil {
+			variables := strings.Split(string(fileData), "\n")
+			envVarsMap, err = parseKeyValue(variables)
+			if err != nil {
+				return nil, errors.New("Invalid file format. Specified file must be contain key-value pairs in YAML, JSON, or KEY=VALUE format.")
+			}
+		}
+	}
+	return envVarsMap, nil
+}
+
+func parseYAML(fileData []byte) (map[string]string, error) {
+	data := map[string]string{}
+	err := yaml.Unmarshal(fileData, &data)
+	return data, err
+}
+
+func parseJSON(fileData []byte) (map[string]string, error) {
+	data := map[string]string{}
+	err := json.Unmarshal(fileData, &data)
+	return data, err
+}
+
+func parseKeyValue(variables []string) (map[string]string, error) {
+	data := map[string]string{}
+	r := regexp.MustCompile("^[a-zA-Z_]+[a-zA-Z0-9_]*$")
+	for _, envVar := range variables {
+		if len(envVar) == 0 {
+			continue
+		}
+		pieces := strings.SplitN(envVar, "=", 2)
+		if len(pieces) != 2 {
+			return nil, fmt.Errorf("Invalid variable format. Expected <key>=<value> but got %s", envVar)
+		}
+		name, value := pieces[0], pieces[1]
+		if !r.MatchString(name) {
+			return nil, fmt.Errorf("Invalid environment variable name '%s'. Environment variable names must only contain letters, numbers, and underscores and must not start with a number.", name)
+		}
+		data[name] = value
+	}
+	return data, nil
 }
 
 // Set adds a new environment variables or updates the value of an existing

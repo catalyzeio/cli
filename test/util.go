@@ -1,10 +1,13 @@
 package test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/catalyzeio/cli/models"
 )
 
 // SetUpGitRepo runs git init in the current directory.
@@ -19,7 +22,7 @@ func SetUpGitRepo() error {
 // SetUpAssociation runs the associate command with the appropriate arguments to
 // successfully associate to the test environment.
 func SetUpAssociation() error {
-	output, err := RunCommand(BinaryName, []string{"associate", EnvLabel, SvcLabel, "-a", Alias})
+	output, err := RunCommand(BinaryName, []string{"associate", EnvName, SvcLabel, "-a", Alias})
 	if err != nil {
 		return fmt.Errorf("Unexpected error setting up association: %s", output)
 	}
@@ -42,4 +45,128 @@ func RunCommand(command string, args []string) (string, error) {
 	cmd.Stdin = strings.NewReader("n\n")
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}
+
+type MockEnvironments struct {
+	Fail bool
+}
+
+func (m *MockEnvironments) List() (*[]models.Environment, map[string]error) {
+	if m.Fail {
+		return &[]models.Environment{}, map[string]error{
+			Pod: errors.New("Failed to list environments"),
+		}
+	}
+	return &[]models.Environment{
+		models.Environment{
+			ID:        EnvID,
+			Name:      EnvName,
+			Pod:       Pod,
+			Namespace: Namespace,
+			OrgID:     OrgID,
+		},
+	}, nil
+}
+
+func (m *MockEnvironments) Retrieve(envID string) (*models.Environment, error) {
+	if m.Fail {
+		return nil, fmt.Errorf("Failed to retrieve environment by ID %s", envID)
+	}
+	return &models.Environment{
+		ID:        EnvID,
+		Name:      EnvName,
+		Pod:       Pod,
+		Namespace: Namespace,
+		OrgID:     OrgID,
+	}, nil
+}
+
+func (m *MockEnvironments) Update(envID string, updates map[string]string) error {
+	if m.Fail {
+		return fmt.Errorf("Failed to update environment by ID %s", envID)
+	}
+	return nil
+}
+
+var DefaultService = models.Service{
+	ID:         SvcID,
+	Identifier: "code-1234",
+	DNS:        "code-1234.internal",
+	Type:       "code",
+	Label:      SvcLabel,
+	Size: models.ServiceSize{
+		RAM:      1,
+		Storage:  0,
+		Behavior: "good",
+		Type:     "code",
+		CPU:      1,
+	},
+	Name:           "code",
+	EnvVars:        map[string]string{},
+	Source:         "git@catalyze-git.com",
+	LBIP:           "127.0.0.1",
+	Scale:          1,
+	WorkerScale:    1,
+	ReleaseVersion: "0",
+	Redeployable:   true,
+}
+
+type MockServices struct {
+	Fail   bool
+	Return *models.Service
+}
+
+func (m *MockServices) List() (*[]models.Service, error) {
+	if m.Fail {
+		return nil, errors.New("Failed to list services")
+	}
+	if m.Return != nil {
+		return &[]models.Service{*m.Return}, nil
+	}
+	return &[]models.Service{DefaultService}, nil
+}
+
+func (m *MockServices) ListByEnvID(envID, podID string) (*[]models.Service, error) {
+	if m.Fail {
+		return nil, fmt.Errorf("Failed to list services by environment ID %s", envID)
+	}
+	if m.Return != nil {
+		return &[]models.Service{*m.Return}, nil
+	}
+	return &[]models.Service{DefaultService}, nil
+}
+
+func (m *MockServices) RetrieveByLabel(label string) (*models.Service, error) {
+	if m.Fail {
+		return nil, fmt.Errorf("Failed to retrieve service by label %s", label)
+	}
+	if m.Return != nil {
+		return m.Return, nil
+	}
+	return &DefaultService, nil
+}
+
+func (m *MockServices) Update(svcID string, updates map[string]string) error {
+	if m.Fail {
+		return fmt.Errorf("Failed to update service by ID %s", svcID)
+	}
+	return nil
+}
+
+type MockSSL struct {
+	Fail bool
+}
+
+func (m *MockSSL) Verify(chainPath, privateKeyPath, hostname string, selfSigned bool) error {
+	if m.Fail {
+		return errors.New("Failed to verify SSL")
+	}
+	return nil
+}
+
+func (m *MockSSL) Resolve(chainPath string) ([]byte, error) {
+	if m.Fail {
+		return nil, fmt.Errorf("Failed to resolve chain at %s", chainPath)
+	}
+	return []byte{}, nil
 }
