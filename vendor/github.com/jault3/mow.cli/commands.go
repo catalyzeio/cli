@@ -376,7 +376,7 @@ func (c *Cmd) PrintLongHelpTo(longDesc bool, writer io.Writer) {
 		fmt.Fprintf(writer, "\nCommands:\n")
 
 		for _, c := range c.Commands {
-			fmt.Fprintf(writer, "  %s\t%s\n", c.Name, c.desc)
+			fmt.Fprintf(w, "  %s\t%s\n", c.Name, c.desc)
 		}
 		w.Flush()
 	}
