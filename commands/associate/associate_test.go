@@ -1,9 +1,12 @@
 package associate
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/catalyzeio/cli/commands/environments"
+	"github.com/catalyzeio/cli/lib/httpclient"
 	"github.com/catalyzeio/cli/models"
 	"github.com/catalyzeio/cli/test"
 )
@@ -21,15 +24,31 @@ var associateTests = []struct {
 }
 
 func TestAssociate(t *testing.T) {
-	settings := &models.Settings{}
+	mockHTTPManager := new(test.MockHTTPManager)
+	mockHTTPManager.TLSManager = httpclient.NewTLSHTTPManager(false)
+	settings := &models.Settings{
+		HTTPManager: mockHTTPManager,
+		Pods: &[]models.Pod{
+			models.Pod{
+				Name: test.Pod,
+			},
+		},
+	}
 	for _, data := range associateTests {
 		t.Logf("Data: %+v", data)
 
 		// reset
 		settings.Environments = map[string]models.AssociatedEnvV2{}
 
+		// expectations
+		//var envs []models.Environment
+		body := []byte("[{\"name\": \"" + test.EnvName + "\",\"id\": \"" + test.EnvID + "\",\"namespace\":\"" + test.Namespace + "\",\"organizationId\":\"" + test.OrgID + "\"}]")
+		mockHTTPManager.On("GetHeaders", settings.SessionToken, settings.Version, test.Pod, settings.UsersID).Return(map[string][]string{})
+		mockHTTPManager.On("Get", []byte(nil), "/environments", map[string][]string{}).Return(body, 200, nil)
+		//mockHTTPManager.On("ConvertResp", body, 200, &envs).Return(nil)
+
 		// test
-		err := CmdAssociate(data.envName, data.alias, New(settings), &test.MockEnvironments{})
+		err := CmdAssociate(data.envName, data.alias, New(settings), environments.New(settings))
 
 		// assert
 		if err != nil != data.expectErr {
@@ -61,16 +80,29 @@ func TestAssociate(t *testing.T) {
 }
 
 func TestAssociateWithPodErrors(t *testing.T) {
+	mockHTTPManager := new(test.MockHTTPManager)
+	mockHTTPManager.TLSManager = httpclient.NewTLSHTTPManager(false)
 	settings := &models.Settings{
+		HTTPManager:  mockHTTPManager,
 		Environments: map[string]models.AssociatedEnvV2{},
+		Pods: &[]models.Pod{
+			models.Pod{
+				Name: test.Pod,
+			},
+		},
 	}
 
+	// expectations
+	body := []byte("{\"message\": \"error\",\"id\": \"1\"}")
+	mockHTTPManager.On("GetHeaders", settings.SessionToken, settings.Version, test.Pod, settings.UsersID).Return(map[string][]string{})
+	mockHTTPManager.On("Get", []byte(nil), "/environments", map[string][]string{}).Return(body, 400, errors.New("error"))
+
 	// test
-	err := CmdAssociate("", "", New(settings), &test.MockEnvironments{Fail: true})
+	err := CmdAssociate("", "", New(settings), environments.New(settings))
 
 	// assert
 	if err == nil {
-		t.Fatalf("Unexpected error: %s", err)
+		t.Fatalf("Expected error but no error returned")
 	}
 	expectedEnvs := map[string]models.AssociatedEnvV2{}
 	if !reflect.DeepEqual(expectedEnvs, settings.Environments) {

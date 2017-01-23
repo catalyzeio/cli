@@ -31,7 +31,7 @@ func CmdAssociate(envName, alias string, ia IAssociate, ie environments.IEnviron
 			if err != nil {
 				return err
 			}
-			if envName == "" {
+			if envName != "" {
 				break
 			}
 		}

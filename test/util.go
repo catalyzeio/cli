@@ -1,13 +1,13 @@
 package test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/catalyzeio/cli/models"
+	"github.com/stretchr/testify/mock"
 )
 
 // SetUpGitRepo runs git init in the current directory.
@@ -47,7 +47,59 @@ func RunCommand(command string, args []string) (string, error) {
 	return string(output), err
 }
 
-type MockEnvironments struct {
+type MockHTTPManager struct {
+	mock.Mock
+	TLSManager models.HTTPManager // used for passing through mocks to the real method invocation
+}
+
+// GetHeaders mocked
+func (m *MockHTTPManager) GetHeaders(sessionToken, version, pod, userID string) map[string][]string {
+	m.Called(sessionToken, version, pod, userID)
+	return map[string][]string{}
+}
+
+// ConvertResp mocked
+func (m *MockHTTPManager) ConvertResp(b []byte, statusCode int, s interface{}) error {
+	return m.TLSManager.ConvertResp(b, statusCode, s)
+}
+
+// Get mocked
+func (m *MockHTTPManager) Get(body []byte, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(body, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+// Post mocked
+func (m *MockHTTPManager) Post(body []byte, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(body, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+// PostFile mocked
+func (m *MockHTTPManager) PostFile(filepath string, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(filepath, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+// PutFile mocked
+func (m *MockHTTPManager) PutFile(filepath string, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(filepath, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+// Put mocked
+func (m *MockHTTPManager) Put(body []byte, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(body, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+// Delete mocked
+func (m *MockHTTPManager) Delete(body []byte, url string, headers map[string][]string) ([]byte, int, error) {
+	args := m.Called(body, url, headers)
+	return args.Get(0).([]byte), args.Int(1), args.Error(2)
+}
+
+/*type MockEnvironments struct {
 	Fail bool
 }
 
@@ -169,4 +221,4 @@ func (m *MockSSL) Resolve(chainPath string) ([]byte, error) {
 		return nil, fmt.Errorf("Failed to resolve chain at %s", chainPath)
 	}
 	return []byte{}, nil
-}
+}*/
