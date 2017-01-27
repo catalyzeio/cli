@@ -25,7 +25,7 @@ func CmdConsole(svcName, command string, ic IConsole, is services.IServices) err
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.\n", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.\n", svcName)
 	}
 	return ic.Open(command, service)
 }

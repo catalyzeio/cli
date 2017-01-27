@@ -28,7 +28,7 @@ func CmdImport(databaseName, filePath, mongoCollection, mongoDatabase string, id
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", databaseName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", databaseName)
 	}
 	logrus.Printf("Backing up \"%s\" before performing the import", databaseName)
 	job, err := id.Backup(service)

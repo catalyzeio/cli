@@ -53,8 +53,8 @@ var Cmd = models.Command{
 
 // ILogs ...
 type ILogs interface {
-	Output(queryString, sessionToken, domain string, follow bool, hours, minutes, seconds, from int, startTimestamp time.Time, endTimestamp time.Time, env *models.Environment) (int, time.Time, error)
-	Stream(queryString, sessionToken, domain string, follow bool, hours, minutes, seconds, from int, timestamp time.Time, env *models.Environment) error
+	Output(queryString, sessionToken, domain string, from int, startTimestamp, endTimestamp time.Time) (int, error)
+	Stream(queryString, sessionToken, domain string, from int, timestamp time.Time) error
 	Watch(queryString, domain, sessionToken string) error
 }
 

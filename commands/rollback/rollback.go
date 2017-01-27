@@ -20,7 +20,7 @@ func CmdRollback(svcName, releaseName string, ij jobs.IJobs, irs releases.IRelea
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	logrus.Printf("Rolling back %s to %s", svcName, releaseName)
 	release, err := irs.Retrieve(releaseName, service.ID)

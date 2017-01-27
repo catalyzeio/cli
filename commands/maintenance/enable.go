@@ -14,7 +14,7 @@ func CmdEnable(svcName string, im IMaintenance, is services.IServices) error {
 		return err
 	}
 	if upstreamService == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	if upstreamService.Type != "code" {
 		return fmt.Errorf("Maintenance mode can only be enabled for code services, not %s services", upstreamService.Type)

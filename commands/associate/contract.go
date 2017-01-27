@@ -15,11 +15,12 @@ var Cmd = models.Command{
 	Name:      "associate",
 	ShortHelp: "Associates an environment",
 	LongHelp: "`associate` is the entry point of the cli. You need to associate an environment before you can run most other commands. " +
-		"Check out [scope](#global-scope) and [aliases](#environment-aliases) for more info on the value of the alias and default options. Here is a sample command\n\n" +
-		"```\ncatalyze associate My-Production-Environment app01 -a prod\n```",
+		"Check out [scope](#global-scope) and [aliases](#environment-aliases) for more info on the value of the alias and default options. Here are some sample commands\n\n" +
+		"```\ncatalyze associate My-Production-Environment -a prod\n" +
+		"catalyze associate\n```",
 	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
 		return func(cmd *cli.Cmd) {
-			envName := cmd.StringOpt("e environment", "", "The name of your environment")
+			envName := cmd.StringArg("ENVIRONMENT", "", "The name of your environment")
 			alias := cmd.StringOpt("a alias", "", "A shorter name to reference your environment by for local commands")
 			cmd.Action = func() {
 				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
@@ -30,7 +31,7 @@ var Cmd = models.Command{
 					logrus.Fatal(err.Error())
 				}
 			}
-			cmd.Spec = "[-e] [-a]"
+			cmd.Spec = "[ENVIRONMENT] [-a]"
 		}
 	},
 }

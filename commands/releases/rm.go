@@ -18,7 +18,7 @@ func CmdRm(svcName, releaseName string, ir IReleases, is services.IServices) err
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	err = ir.Rm(releaseName, service.ID)
 	if err != nil {

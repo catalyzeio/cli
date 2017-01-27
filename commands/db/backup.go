@@ -15,7 +15,7 @@ func CmdBackup(databaseName string, skipPoll bool, id IDb, is services.IServices
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", databaseName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", databaseName)
 	}
 	job, err := id.Backup(service)
 	if err != nil {

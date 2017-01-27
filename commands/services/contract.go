@@ -21,20 +21,6 @@ var Cmd = models.Command{
 			cmd.CommandLong(ListSubCmd.Name, ListSubCmd.ShortHelp, ListSubCmd.LongHelp, ListSubCmd.CmdFunc(settings))
 			cmd.CommandLong(StopSubCmd.Name, StopSubCmd.ShortHelp, StopSubCmd.LongHelp, StopSubCmd.CmdFunc(settings))
 			cmd.CommandLong(RenameSubCmd.Name, RenameSubCmd.ShortHelp, RenameSubCmd.LongHelp, RenameSubCmd.CmdFunc(settings))
-			cmd.Action = func() {
-				logrus.Warnln("This command has been moved! Please use \"catalyze services list\" instead. This alias will be removed in the next CLI update.")
-				logrus.Warnln("You can list all available services subcommands by running \"catalyze services --help\".")
-				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
-					logrus.Fatal(err.Error())
-				}
-				if err := config.CheckRequiredAssociation(true, true, settings); err != nil {
-					logrus.Fatal(err.Error())
-				}
-				err := CmdServices(New(settings))
-				if err != nil {
-					logrus.Fatal(err.Error())
-				}
-			}
 		}
 	},
 }

@@ -27,8 +27,7 @@ const size = 50
 // command.
 func CmdLogs(queryString string, follow bool, hours, minutes, seconds int, envID string, settings *models.Settings, il ILogs, ip prompts.IPrompts, ie environments.IEnvironments, is services.IServices, isites sites.ISites) error {
 	if follow && (hours > 0 || minutes > 0 || seconds > 0) {
-		logrus.Warnln("Specifying \"logs -f\" in combination with \"--hours\", \"--minutes\", or \"--seconds\" has been deprecated!")
-		logrus.Warnln("Please specify either \"-f\" or use \"--hours\", \"--minutes\", \"--seconds\" but not both. Support for \"-f\" and a specified time frame will be removed in a later version.")
+		return fmt.Errorf("Specifying \"-f\" in combination with \"--hours\", \"--minutes\", or \"--seconds\" is unsupported.")
 	}
 	env, err := ie.Retrieve(envID)
 	if err != nil {
@@ -53,7 +52,7 @@ func CmdLogs(queryString string, follow bool, hours, minutes, seconds int, envID
 		return errors.New("Could not determine the fully qualified domain name of your environment. Please contact Catalyze Support at support@catalyze.io with this error message to resolve this issue.")
 	}
 	if follow {
-		if err := il.Watch(queryString, domain, settings.SessionToken); err != nil {
+		if err = il.Watch(queryString, domain, settings.SessionToken); err != nil {
 			logrus.Debugf("Error attempting to stream logs from logwatch: %s", err)
 		} else {
 			return nil
@@ -62,17 +61,17 @@ func CmdLogs(queryString string, follow bool, hours, minutes, seconds int, envID
 	from := 0
 	offset := time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute + time.Duration(seconds)*time.Second
 	timestamp := time.Now().In(time.UTC).Add(-1 * offset)
-	from, timestamp, err = il.Output(queryString, settings.SessionToken, domain, follow, hours, minutes, seconds, from, timestamp, time.Now(), env)
+	from, err = il.Output(queryString, settings.SessionToken, domain, from, timestamp, time.Now())
 	if err != nil {
 		return err
 	}
 	if follow {
-		return il.Stream(queryString, settings.SessionToken, domain, follow, hours, minutes, seconds, from, timestamp, env)
+		return il.Stream(queryString, settings.SessionToken, domain, from, timestamp)
 	}
 	return nil
 }
 
-func (l *SLogs) Output(queryString, sessionToken, domain string, follow bool, hours, minutes, seconds, from int, startTimestamp, endTimestamp time.Time, env *models.Environment) (int, time.Time, error) {
+func (l *SLogs) Output(queryString, sessionToken, domain string, from int, startTimestamp, endTimestamp time.Time) (int, error) {
 	appLogsIdentifier := "source"
 	appLogsValue := "app"
 	if strings.HasPrefix(domain, "pod01") || strings.HasPrefix(domain, "csb01") {
@@ -90,12 +89,12 @@ func (l *SLogs) Output(queryString, sessionToken, domain string, follow bool, ho
 
 		resp, statusCode, err := l.Settings.HTTPManager.Get(queryBytes, fmt.Sprintf("%s/_search", urlString), headers)
 		if err != nil {
-			return from, startTimestamp, err
+			return from, err
 		}
 		var logs models.Logs
 		err = l.Settings.HTTPManager.ConvertResp(resp, statusCode, &logs)
 		if err != nil {
-			return from, startTimestamp, err
+			return from, err
 		}
 
 		end := time.Time{}
@@ -113,17 +112,16 @@ func (l *SLogs) Output(queryString, sessionToken, domain string, follow bool, ho
 		}
 		time.Sleep(config.JobPollTime * time.Second)
 	}
-	return from, startTimestamp, nil
+	return from, nil
 }
 
-func (l *SLogs) Stream(queryString, sessionToken, domain string, follow bool, hours, minutes, seconds, from int, timestamp time.Time, env *models.Environment) error {
+func (l *SLogs) Stream(queryString, sessionToken, domain string, from int, timestamp time.Time) error {
 	for {
-		f, t, err := l.Output(queryString, sessionToken, domain, follow, hours, minutes, seconds, from, timestamp, time.Now(), env)
+		f, err := l.Output(queryString, sessionToken, domain, from, timestamp, time.Now())
 		if err != nil {
 			return err
 		}
 		from = f
-		timestamp = t
 		time.Sleep(config.LogPollTime * time.Second)
 	}
 }

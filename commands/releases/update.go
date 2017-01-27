@@ -23,7 +23,7 @@ func CmdUpdate(svcName, releaseName, notes, newReleaseName string, ir IReleases,
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	err = ir.Update(releaseName, service.ID, notes, newReleaseName)
 	if err != nil {

@@ -14,23 +14,11 @@ import (
 var Cmd = models.Command{
 	Name:      "environments",
 	ShortHelp: "Manage environments for which you have access",
-	LongHelp: "This command has been moved! Please use [environments list](#environments-list) instead. This alias will be removed in the next CLI update.\n\n" +
-		"The `environments` command allows you to manage your environments. The environments command can not be run directly but has sub commands.",
+	LongHelp:  "The `environments` command allows you to manage your environments. The environments command can not be run directly but has sub commands.",
 	CmdFunc: func(settings *models.Settings) func(cmd *cli.Cmd) {
 		return func(cmd *cli.Cmd) {
 			cmd.CommandLong(ListSubCmd.Name, ListSubCmd.ShortHelp, ListSubCmd.LongHelp, ListSubCmd.CmdFunc(settings))
 			cmd.CommandLong(RenameSubCmd.Name, RenameSubCmd.ShortHelp, RenameSubCmd.LongHelp, RenameSubCmd.CmdFunc(settings))
-			cmd.Action = func() {
-				logrus.Warnln("This command has been moved! Please use \"catalyze environments list\" instead. This alias will be removed in the next CLI update.")
-				logrus.Warnln("You can list all available environments subcommands by running \"catalyze environments --help\".")
-				if _, err := auth.New(settings, prompts.New()).Signin(); err != nil {
-					logrus.Fatal(err.Error())
-				}
-				err := CmdList(New(settings))
-				if err != nil {
-					logrus.Fatal(err.Error())
-				}
-			}
 		}
 	},
 }

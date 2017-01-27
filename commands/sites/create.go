@@ -15,7 +15,7 @@ func CmdCreate(name, serviceName, hostname string, clientMaxBodySize, proxyConne
 		return err
 	}
 	if upstreamService == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", serviceName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", serviceName)
 	}
 
 	serviceProxy, err := iservices.RetrieveByLabel("service_proxy")

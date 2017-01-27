@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -12,14 +13,13 @@ import (
 	"github.com/catalyzeio/cli/commands/deploykeys"
 	"github.com/catalyzeio/cli/config"
 	"github.com/catalyzeio/cli/models"
-	"github.com/mitchellh/go-homedir"
 )
 
 func CmdAdd(name, path string, ik IKeys, id deploykeys.IDeployKeys) error {
 	if strings.ContainsAny(name, config.InvalidChars) {
 		return fmt.Errorf("Invalid key name. Names must not contain the following characters: %s", config.InvalidChars)
 	}
-	fullPath, err := homedir.Expand(path)
+	fullPath, err := filepath.Abs(path)
 	if err != nil {
 		return err
 	}

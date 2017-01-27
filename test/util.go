@@ -1,16 +1,12 @@
 package test
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"strings"
-
+	"github.com/catalyzeio/cli/lib/httpclient"
 	"github.com/catalyzeio/cli/models"
-	"github.com/stretchr/testify/mock"
+	"github.com/daticahealth/cli/test"
 )
 
-// SetUpGitRepo runs git init in the current directory.
+/*// SetUpGitRepo runs git init in the current directory.
 func SetUpGitRepo() error {
 	output, err := RunCommand("git", []string{"init"})
 	if err != nil {
@@ -45,6 +41,41 @@ func RunCommand(command string, args []string) (string, error) {
 	cmd.Stdin = strings.NewReader("n\n")
 	output, err := cmd.CombinedOutput()
 	return string(output), err
+}*/
+
+func GetSettings(baseURL string) *models.Settings {
+	return &models.Settings{
+		HTTPManager: httpclient.NewTLSHTTPManager(false),
+		PaasHost:    baseURL,
+		Environments: map[string]models.AssociatedEnvV2{
+			test.Alias: models.AssociatedEnvV2{
+				Name:          EnvName,
+				EnvironmentID: EnvID,
+				Pod:           Pod,
+				OrgID:         OrgID,
+			},
+		},
+		EnvironmentID: EnvID,
+		Pods: &[]models.Pod{
+			models.Pod{
+				Name: Pod,
+			},
+			models.Pod{
+				Name: PodAlt,
+			},
+		},
+	}
+}
+
+/*func HeaderMatcher(pod string) func(map[string][]string) bool {
+	return func(m map[string][]string) bool {
+		for _, s := range m["X-Pod-ID"] {
+			if s == pod {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 type MockHTTPManager struct {
@@ -54,8 +85,9 @@ type MockHTTPManager struct {
 
 // GetHeaders mocked
 func (m *MockHTTPManager) GetHeaders(sessionToken, version, pod, userID string) map[string][]string {
-	m.Called(sessionToken, version, pod, userID)
-	return map[string][]string{}
+	//m.Called(sessionToken, version, pod, userID)
+	//return map[string][]string{"pod": []string{pod}}
+	return m.TLSManager.GetHeaders(sessionToken, version, pod, userID)
 }
 
 // ConvertResp mocked
@@ -99,7 +131,7 @@ func (m *MockHTTPManager) Delete(body []byte, url string, headers map[string][]s
 	return args.Get(0).([]byte), args.Int(1), args.Error(2)
 }
 
-/*type MockEnvironments struct {
+type MockEnvironments struct {
 	Fail bool
 }
 

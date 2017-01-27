@@ -3,50 +3,92 @@ package certs
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
-	"github.com/catalyzeio/cli/models"
+	"github.com/catalyzeio/cli/commands/services"
+	"github.com/catalyzeio/cli/commands/ssl"
 	"github.com/catalyzeio/cli/test"
 )
 
 const (
 	certName = "example.com"
 	pubKey   = `-----BEGIN CERTIFICATE-----
-MIICATCCAWoCCQCsoDP5n7FfzzANBgkqhkiG9w0BAQUFADBFMQswCQYDVQQGEwJB
-VTETMBEGA1UECBMKU29tZS1TdGF0ZTEhMB8GA1UEChMYSW50ZXJuZXQgV2lkZ2l0
-cyBQdHkgTHRkMB4XDTE1MDYwNDE5MTkzNVoXDTE2MDYwMzE5MTkzNVowRTELMAkG
-A1UEBhMCQVUxEzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNVBAoTGEludGVybmV0
-IFdpZGdpdHMgUHR5IEx0ZDCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA3+Gz
-NFJhBdbUcFUxzlm70DJHXa9+nOAHZ9S6c66T1FXBRF94GfTSq8Qg9U+EOZf5cuhN
-6wkLD1LLHMdb/UEjyCVVOqscfeR/nPCT5B9sv881PM8jL8C7grAUezcKiNx7Fng8
-Dj9sczwziBR9P5ke5TI1g62LhHc0KGgMa8oNY7UCAwEAATANBgkqhkiG9w0BAQUF
-AAOBgQBgTk8C+e13xGEw8qI2xhNfudt+8ffzIjNNWptb8rhGWblyY7EVBuU24LqE
-oIOS7EH2aRhgvZjPUEQCNl+foQBRnRkYBeBhfUTl8QAUQNIyRUAHlQcPct9+VYcz
-7OeuMetZkluMG3w62ooiufaGC/8orztDEySO4cj1HWssE2h/zw==
+MIIDFDCCAfygAwIBAgIJAJ04dO4O6PrLMA0GCSqGSIb3DQEBBQUAMBAxDjAMBgNV
+BAMTBWxvY2FsMB4XDTE3MDEyNjA2MjQwMloXDTI3MDEyNDA2MjQwMlowEDEOMAwG
+A1UEAxMFbG9jYWwwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7dwM2
+rMj9N0mEZP+V9sWx0MKcuc4Uymv4BbJO/dP7ryXJEMqSZc7DrmUs1XTKEguWu9dL
+0BylzCvaWalqKixojWL1Wojj6i8DfgHgFum+Fjd3EUZhbNnerfCC94Of1XCRSezG
+sWP7V0gGSlxoptRvhH4NTHkyemnaZEDs323VtuhG0AgoQ8EWS/XeVAWLlSsHRPWp
+BXjQn0ve33SsnbhbpkRkyB1jlH7vxbEaAX9aKrZYYSmXLz3NKp8ti8AljqybWC86
+ymVl5qStd6yz/CrFiGWki0F46/BdPB8ZCY4iOsuMXbWWDiRuq7llu8iWEat651DO
+VeAPKdQsRZgK/y1hAgMBAAGjcTBvMB0GA1UdDgQWBBRrj840X4a+uGDsKCRMHzX1
+mtXAWTBABgNVHSMEOTA3gBRrj840X4a+uGDsKCRMHzX1mtXAWaEUpBIwEDEOMAwG
+A1UEAxMFbG9jYWyCCQCdOHTuDuj6yzAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEB
+BQUAA4IBAQAVpa/IkKyDPE7X4RsHZLsinEfJpAahrLsSBGDIo6cgpB3txntgmoLU
+pC71ZQEE5glE4ENvflyLvvg6fAwlOVL0sax0GKfYgLJhg11CmsoRYiHCPh/bwqtU
+iqAzjo7yCsyzo1Q0IMbc0RHFBmikHJEL6Dsuri1Skj+KnXLBibl8FeFuppgusV+W
+8q3T/6ZNM8nFhRAPAQf7n4c4y+VjYuw/WSEdByH2NuLnLivb97E5BC0nr3/AK0Kz
+MSsO3RiSxj07Gepc+Ce0VNXZkVAjUiwHvZeC7ebLC/SQs8ihogi/TVELgQkksgC/
+lyUFiVHqjeeIKxYNy3d7RqGxzKKDRssi
 -----END CERTIFICATE-----`
 	privKey = `-----BEGIN RSA PRIVATE KEY-----
-MIICXQIBAAKBgQDf4bM0UmEF1tRwVTHOWbvQMkddr36c4Adn1LpzrpPUVcFEX3gZ
-9NKrxCD1T4Q5l/ly6E3rCQsPUsscx1v9QSPIJVU6qxx95H+c8JPkH2y/zzU8zyMv
-wLuCsBR7NwqI3HsWeDwOP2xzPDOIFH0/mR7lMjWDrYuEdzQoaAxryg1jtQIDAQAB
-AoGAeXoVqoYobuqqSmlvpO+7oLQnVQYsRSKp4gTjRnGrdMMzIs5KdIsK5Hh/CZwj
-urxjdZ3m6Wj2v1HFM9BYcYouxx5ZYbUWx4tXeQhoVjvu8GxU6uwkDl+kQMjqcvfV
-dXEoIm7ejzcvialYlHnsO8HFiB3ayhoQOK3kGcY6dGISWwECQQD/7R8/EIPAP0lU
-P97w+I7j2kG79PTvCzoXygqVrmjeW6RJ6FvzT30iCnr5PVmPzHReL+q3i6tMHpGi
-eeo0T0atAkEA3/I22OTH2QrKmSaW3EoPNDq78hJzsbSoVaHz+6mMn2ZungzBhJ7i
-dOkUzkzuZtftYIcCQ2MtGDeSNIXuohOaKQJADwbVNta5ZahRnejCJlPxz98YzPht
-CTwXhR4P0QoUjjnDQ7Oo8nhQWJdU8R1xDMhsbLtThMNmo2mIE4ok/j1JYQJBAJKg
-pqSwduF3HVvVVmV54CaUZkaDKlkqLiWTWopmYvpjOP4m3/YTibZ+fe7tlBKmQng3
-LZYts3Ltv77ACpT4PLECQQDDql4xPUb6WfsSjyqqfwnzkFLWADTcQQG5MmUX6iNJ
-FBlcbW65DK1xPIitnX+jf803WaMPAP5YBoH6jC6VgcVH
+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
 -----END RSA PRIVATE KEY-----`
-)
-
-var (
 	pubKeyPath  = "example.pem"
 	privKeyPath = "example-key.pem"
 	invalidPath = "invalid-file.pem"
 )
+
+var (
+	mux     *http.ServeMux
+	server  *httptest.Server
+	baseURL *url.URL
+)
+
+func setup() {
+	mux = http.NewServeMux()
+	server = httptest.NewServer(mux)
+
+	baseURL, _ = url.Parse(server.URL)
+}
+
+func teardown() {
+	server.Close()
+}
+
+func testMethod(t *testing.T, r *http.Request, want string) {
+	if want != r.Method {
+		t.Errorf("Request method = %v, want %v", r.Method, want)
+	}
+}
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -76,21 +118,27 @@ var certCreateTests = []struct {
 }
 
 func TestCertsCreate(t *testing.T) {
-	settings := &models.Settings{
-		Environments: map[string]models.AssociatedEnvV2{
-			test.Alias: models.AssociatedEnvV2{
-				Name:          test.EnvName,
-				EnvironmentID: test.EnvID,
-				Pod:           test.Pod,
-				OrgID:         test.OrgID,
-			},
+	setup()
+	defer teardown()
+	settings := test.GetSettings(baseURL.String())
+	mux.HandleFunc("/environments/"+test.EnvID+"/services/"+test.SvcID+"/certs",
+		func(w http.ResponseWriter, r *http.Request) {
+			testMethod(t, r, "POST")
+			fmt.Fprint(w, `{}`)
 		},
-	}
+	)
+	mux.HandleFunc("/environments/"+test.EnvID+"/services",
+		func(w http.ResponseWriter, r *http.Request) {
+			testMethod(t, r, "GET")
+			fmt.Fprint(w, fmt.Sprintf(`[{"id":"%s","label":"service_proxy"}]`, test.SvcID))
+		},
+	)
+
 	for _, data := range certCreateTests {
 		t.Logf("Data: %+v", data)
 
 		// test
-		err := CmdCreate(data.hostname, data.pubKeyPath, data.privKeyPath, data.selfSigned, data.resolve, New(settings), &test.MockServices{}, &test.MockSSL{})
+		err := CmdCreate(data.hostname, data.pubKeyPath, data.privKeyPath, data.selfSigned, data.resolve, New(settings), services.New(settings), ssl.New(settings))
 
 		// assert
 		if err != nil != data.expectErr {
@@ -101,28 +149,18 @@ func TestCertsCreate(t *testing.T) {
 }
 
 func TestCertsCreateFailSSL(t *testing.T) {
-	settings := &models.Settings{
-		Environments: map[string]models.AssociatedEnvV2{
-			test.Alias: models.AssociatedEnvV2{
-				Name:          test.EnvName,
-				EnvironmentID: test.EnvID,
-				Pod:           test.Pod,
-				OrgID:         test.OrgID,
-			},
+	setup()
+	defer teardown()
+	settings := test.GetSettings(baseURL.String())
+	mux.HandleFunc("/environments/"+test.EnvID+"/services",
+		func(w http.ResponseWriter, r *http.Request) {
+			testMethod(t, r, "GET")
+			fmt.Fprint(w, fmt.Sprintf(`[{"id":"%s","label":"service_proxy"}]`, test.SvcID))
 		},
-	}
+	)
 
 	// test
-	err := CmdCreate(certName, pubKeyPath, privKeyPath, false, false, New(settings), &test.MockServices{}, &test.MockSSL{Fail: true})
-
-	// assert
-	if err != nil {
-		// with resolve = false, no SSL code should be called
-		t.Fatalf("Unexpected error: %s", err)
-	}
-
-	// test
-	err = CmdCreate(certName, pubKeyPath, privKeyPath, false, true, New(settings), &test.MockServices{}, &test.MockSSL{Fail: true})
+	err := CmdCreate(certName, pubKeyPath, privKeyPath, false, false, New(settings), services.New(settings), ssl.New(settings))
 
 	// assert
 	if err == nil {

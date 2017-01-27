@@ -26,7 +26,7 @@ func CmdAdd(name, keyPath, svcName string, id IDeployKeys, is services.IServices
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	if service.Type != "code" {
 		return fmt.Errorf("You can only add deploy keys to code services, not %s services", service.Type)

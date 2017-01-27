@@ -3,16 +3,16 @@ package keys
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/catalyzeio/cli/lib/auth"
 	"github.com/catalyzeio/cli/lib/prompts"
 	"github.com/catalyzeio/cli/models"
-	"github.com/mitchellh/go-homedir"
 )
 
 func CmdSet(path string, settings *models.Settings) error {
-	fullPath, err := homedir.Expand(path)
+	fullPath, err := filepath.Abs(path)
 	if err != nil {
 		return err
 	}

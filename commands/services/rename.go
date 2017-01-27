@@ -13,7 +13,7 @@ func CmdRename(svcName, label string, is IServices) error {
 		return err
 	}
 	if service == nil {
-		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services\" command.", svcName)
+		return fmt.Errorf("Could not find a service with the label \"%s\". You can list services with the \"catalyze services list\" command.", svcName)
 	}
 	data := map[string]string{}
 	data["label"] = label

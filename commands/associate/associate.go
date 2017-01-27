@@ -36,7 +36,7 @@ func CmdAssociate(envName, alias string, ia IAssociate, ie environments.IEnviron
 			}
 		}
 	}
-	if !found {
+	if envName != "" && !found {
 		return fmt.Errorf("No environment with name \"%s\" found", envName)
 	}
 	logrus.Println("After associating to an environment, you need to add a git repository with the \"catalyze git-remote add\" command and add a cert with the \"catalyze certs create\" command, if you have not done so already")
