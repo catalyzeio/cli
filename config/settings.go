@@ -73,6 +73,10 @@ func (s FileSettingsRetriever) GetSettings(envName, svcName, accountsHost, authH
 		if settings.EnvironmentID == "" {
 			logrus.Fatalf("No environment named \"%s\" has been associated. Run \"catalyze associated\" to see what environments have been associated or run \"catalyze associate\" from a local git repo to create a new association", envName)
 		}
+	} else if len(settings.Environments) == 1 {
+		for name := range settings.Environments {
+			setGivenEnv(name, &settings)
+		}
 	}
 
 	settings.AccountsHost = accountsHost
