@@ -11,7 +11,7 @@ func Update() {
 	fmt.Println("Checking for available updates...")
 	updater.AutoUpdater.FetchInfo()
 	if updater.AutoUpdater.CurrentVersion == updater.AutoUpdater.Info.Version {
-		fmt.Println("You are already running the latest version of the Catalyze CLI")
+		fmt.Println("You are already running the latest 2.x version of the Catalyze CLI")
 		return
 	}
 	updater.AutoUpdater.ForcedUpgrade()
